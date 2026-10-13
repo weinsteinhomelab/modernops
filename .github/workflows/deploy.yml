@@ -1,0 +1,25 @@
+name: Deploy to SiteGround
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_key
+          chmod 600 ~/.ssh/id_key
+          ssh-keyscan -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy
+        run: |
+          rsync -avz \
+            -e "ssh -p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_key" \
+            --exclude='.git*' --exclude='.github' \
+            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/www/modern-ops.net/public_html/
