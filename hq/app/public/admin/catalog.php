@@ -4,6 +4,7 @@ require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_billing.php';
 require_login();
+require_product('quotes');
 
 $msg = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ops Essentials | Modern Ops</title>
+<meta name="description" content="Ops Essentials: a customer list, a quote builder and your business email in one place, set up for your business by Modern Ops.">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231a6b4a'/%3E%3Ctext%20x='16'%20y='21.5'%20font-family='Georgia,serif'%20font-size='16'%20font-weight='700'%20text-anchor='middle'%3E%3Ctspan%20fill='%231a1a1a'%3EM%3C/tspan%3E%3Ctspan%20fill='%23ffffff'%3EO%3C/tspan%3E%3C/text%3E%3C/svg%3E">
+
+<script>document.documentElement.className += ' js';</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Lato:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --black: #1a1a1a;
+    --white: #fafaf8;
+    --accent: #1a6b4a;
+    --accent-light: #e8f4ee;
+    --mid: #555;
+    --border: #ddd;
+    --card-bg: #ffffff;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Lato', sans-serif;
+    background: var(--white);
+    color: var(--black);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 6%;
+    border-bottom: 1px solid var(--border);
+    background: var(--white);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-weight: 800;
+    font-size: 1.4rem;
+    color: var(--black);
+    text-decoration: none;
+    letter-spacing: -0.01em;
+  }
+
+  .logo span { color: var(--accent); }
+
+  nav ul { list-style: none; display: flex; gap: 2rem; }
+
+  nav ul a {
+    text-decoration: none;
+    color: var(--mid);
+    font-size: 0.9rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    transition: color 0.2s;
+  }
+
+  nav ul a:hover { color: var(--accent); }
+
+  .nav-cta {
+    background: var(--accent) !important;
+    color: white !important;
+    padding: 0.5rem 1.25rem;
+    border-radius: 6px;
+    transition: opacity 0.2s !important;
+  }
+
+  .nav-cta:hover { opacity: 0.85; }
+
+  .hero {
+    padding: 6rem 6% 5rem;
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+  }
+
+  @media (max-width: 750px) {
+    .hero { grid-template-columns: 1fr; gap: 2rem; }
+    nav ul { display: none; }
+    .contact-grid { grid-template-columns: 1fr; }
+  }
+
+  .hero-tag {
+    display: inline-block;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.35rem 0.85rem;
+    border-radius: 4px;
+    margin-bottom: 1.5rem;
+  }
+
+  .hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-weight: 800;
+    font-size: clamp(2.2rem, 4vw, 3.2rem);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin-bottom: 1.25rem;
+    color: var(--black);
+  }
+
+  .hero h1 em { font-style: italic; color: var(--accent); }
+
+  .hero p {
+    font-size: 1.05rem;
+    color: var(--mid);
+    margin-bottom: 2rem;
+    line-height: 1.75;
+    max-width: 480px;
+  }
+
+  .hero-btns { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+    padding: 0.8rem 1.75rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: 0.02em;
+    transition: opacity 0.2s;
+  }
+
+  .btn-primary:hover { opacity: 0.85; }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--black);
+    padding: 0.8rem 1.75rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.9rem;
+    border: 1.5px solid var(--border);
+    transition: border-color 0.2s;
+  }
+
+  .btn-secondary:hover { border-color: var(--black); }
+
+  .hero-visual {
+    background: #f0ede5;
+    border-radius: 16px;
+    padding: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .hero-stat {
+    background: white;
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--border);
+  }
+
+  .hero-stat-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mid);
+    margin-bottom: 0.25rem;
+  }
+
+  .hero-stat-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  section {
+    padding: 5rem 6%;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .section-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.75rem;
+  }
+
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-weight: 800;
+    font-size: clamp(1.75rem, 3vw, 2.4rem);
+    letter-spacing: -0.02em;
+    margin-bottom: 1rem;
+    line-height: 1.2;
+  }
+
+  .section-sub {
+    color: var(--mid);
+    max-width: 520px;
+    margin-bottom: 3rem;
+    line-height: 1.75;
+  }
+
+  .services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+  }
+
+  .service-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .service-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 4px 20px rgba(26,107,74,0.08);
+  }
+
+  .service-icon {
+    width: 44px;
+    height: 44px;
+    background: var(--accent-light);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+  }
+
+  .service-icon svg {
+    width: 22px;
+    height: 22px;
+    stroke: var(--accent);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .service-card h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--black);
+  }
+
+  .service-card p {
+    font-size: 0.875rem;
+    color: var(--mid);
+    line-height: 1.65;
+  }
+
+  .steps-section {
+    background: #f0ede5;
+    border-radius: 20px;
+    padding: 4rem 5%;
+    margin: 0 2%;
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-top: 2.5rem;
+  }
+
+  .step-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: #c8c4bc;
+    line-height: 1;
+    margin-bottom: 0.75rem;
+  }
+
+  .step h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+    color: var(--black);
+  }
+
+  .step p {
+    font-size: 0.875rem;
+    color: var(--mid);
+    line-height: 1.65;
+  }
+
+  .contact-section {
+    background: var(--black);
+    color: var(--white);
+    border-radius: 20px;
+    padding: 5rem 5%;
+    margin: 3rem 2% 0;
+  }
+
+  .contact-section .section-label { color: #5fcfa0; }
+
+  .contact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: start;
+  }
+
+  .contact-info p {
+    color: #999;
+    font-size: 0.9rem;
+    margin-bottom: 2rem;
+    line-height: 1.75;
+  }
+
+  .contact-detail {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    color: #ccc;
+    font-size: 0.9rem;
+  }
+
+  .contact-detail a { color: #5fcfa0; text-decoration: none; }
+
+  .contact-form { display: flex; flex-direction: column; gap: 0.85rem; }
+
+  .contact-form input,
+  .contact-form textarea {
+    background: #262626;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    color: var(--white);
+    font-family: 'Lato', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+
+  .contact-form input:focus,
+  .contact-form textarea:focus { border-color: var(--accent); }
+
+  .contact-form input::placeholder,
+  .contact-form textarea::placeholder { color: #555; }
+
+  .contact-form textarea { resize: vertical; min-height: 120px; }
+
+  .contact-form button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0.9rem;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    font-family: 'Lato', sans-serif;
+  }
+
+  .contact-form button:hover { opacity: 0.85; }
+
+  footer {
+    text-align: center;
+    padding: 2rem 6%;
+    font-size: 0.8rem;
+    color: #aaa;
+  }
+
+  hr.divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* ---------- Motion: tasteful scroll-reveal + hero intro ----------
+     Hidden state only applies when JS is on (.js) so no-JS users still
+     see all content. Fully disabled under prefers-reduced-motion.      */
+  .js .reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    will-change: opacity, transform;
+  }
+
+  .js .reveal.in-view {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Stagger: each item delayed by its index (--i) for a cascade */
+  .js .stagger { transition-delay: calc(var(--i, 0) * 80ms); }
+
+  /* Hero text + buttons fade/slide in on page load */
+  .js .hero-animate {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: heroIntro 0.5s ease forwards;
+    animation-delay: var(--d, 0ms);
+  }
+
+  @keyframes heroIntro {
+    to { opacity: 1; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .js .reveal,
+    .js .hero-animate {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+
+  /* ---------- Ops Essentials page ---------- */
+  nav ul a.current { color: var(--accent); }
+
+  .product-card { display: flex; flex-direction: column; }
+  .product-card .lead { font-size: 0.95rem; color: var(--black); margin-bottom: 0.9rem; line-height: 1.6; }
+  .product-card ul { list-style: none; display: flex; flex-direction: column; gap: 0.55rem; }
+  .product-card li {
+    position: relative;
+    padding-left: 1.35rem;
+    font-size: 0.875rem;
+    color: var(--mid);
+    line-height: 1.6;
+  }
+  .product-card li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.5em;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+  .product-card .note { margin-top: 1rem; font-size: 0.8rem; color: var(--mid); }
+  .product-card .note a { color: var(--accent); font-weight: 700; text-decoration: none; }
+
+  .bundle {
+    background: var(--accent-light);
+    border-radius: 16px;
+    padding: 2.5rem;
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 2.5rem;
+    align-items: center;
+  }
+  .bundle p { color: var(--mid); line-height: 1.75; }
+  .bundle-list { display: flex; flex-direction: column; gap: 0.6rem; }
+  .bundle-item {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.85rem 1.1rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .bundle-item span { font-weight: 500; color: var(--mid); font-size: 0.8rem; text-align: right; }
+
+  .faq { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem 2.5rem; }
+  .faq h3 { font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 700; margin-bottom: 0.35rem; }
+  .faq p { font-size: 0.9rem; color: var(--mid); line-height: 1.7; }
+
+  .cta-band { text-align: center; }
+  .cta-band .section-sub { margin-left: auto; margin-right: auto; color: #999; }
+  .cta-band .btn-primary { display: inline-block; }
+
+  @media (max-width: 750px) {
+    .bundle { grid-template-columns: 1fr; padding: 1.75rem; gap: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../" class="logo"><img src="../modernops_logo.svg" alt="Modern Ops" style="height: 55px; width: auto;"></a>
+  <ul>
+    <li><a href="../#services">Services</a></li>
+    <li><a href="./" class="current" aria-current="page">Ops Essentials</a></li>
+    <li><a href="../#how">How It Works</a></li>
+    <li><a href="../#contact" class="nav-cta">Get in Touch</a></li>
+  </ul>
+</nav>
+
+<div class="hero">
+  <div>
+    <div class="hero-tag hero-animate" style="--d:0ms">Ops Essentials</div>
+    <h1 class="hero-animate" style="--d:70ms">Your customers, quotes and email <em>in one place.</em></h1>
+    <p class="hero-animate" style="--d:140ms">Ops Essentials is a set of simple office tools we set up for your business. Keep track of customers, send quotes that look professional, and answer your business email, all from one login with your name on it.</p>
+    <div class="hero-btns hero-animate" style="--d:210ms">
+      <a href="../#contact" class="btn-primary">Ask about Ops Essentials</a>
+      <a href="#products" class="btn-secondary">See what's included</a>
+    </div>
+  </div>
+  <div class="hero-visual hero-animate" style="--d:180ms">
+    <div class="hero-stat">
+      <div class="hero-stat-label">Ops Customers</div>
+      <div class="hero-stat-value">Every customer, one list</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-label">Ops Quotes</div>
+      <div class="hero-stat-value">Quotes in minutes</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-label">Ops Inbox</div>
+      <div class="hero-stat-value">Your email, right there</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<section id="products">
+  <div class="section-label reveal stagger" style="--i:0">What's Included</div>
+  <div class="section-title reveal stagger" style="--i:1">Three tools. Use one, or all three.</div>
+  <p class="section-sub reveal stagger" style="--i:2">Each one works on its own. Start with whatever is costing you the most time and add the others when you're ready.</p>
+  <div class="services-grid">
+
+    <div class="service-card product-card reveal stagger" style="--i:0">
+      <div class="service-icon">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/><path d="M18 13.8c2.1.8 3.5 2.9 3.5 5.2"/></svg>
+      </div>
+      <h3>Ops Customers</h3>
+      <p class="lead">Know who you work with and where every job stands.</p>
+      <ul>
+        <li>Every customer with their phone, email, address and notes.</li>
+        <li>Requests from your website form show up on their own. Nothing gets lost in an inbox.</li>
+        <li>Log calls, texts and visits, so you always know who you talked to last.</li>
+        <li>See each customer's quotes and history on one page.</li>
+      </ul>
+    </div>
+
+    <div class="service-card product-card reveal stagger" style="--i:1">
+      <div class="service-icon">
+        <svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><path d="M9 12h7M9 16h7"/></svg>
+      </div>
+      <h3>Ops Quotes</h3>
+      <p class="lead">Send a clean, professional quote while the customer is still interested.</p>
+      <ul>
+        <li>Save your services and prices once. Add them to any quote with a click.</li>
+        <li>One-time and monthly, quarterly or yearly prices on the same quote.</li>
+        <li>A PDF with your logo and your terms, emailed straight to the customer.</li>
+        <li>See which quotes are waiting, accepted or turned down.</li>
+      </ul>
+    </div>
+
+    <div class="service-card product-card reveal stagger" style="--i:2">
+      <div class="service-icon">
+        <svg viewBox="0 0 24 24"><path d="M3 13l2.5-8h13L21 13v6H3z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/></svg>
+      </div>
+      <h3>Ops Inbox</h3>
+      <p class="lead">Read and answer your business email next to your customers.</p>
+      <ul>
+        <li>All of your business mailboxes on one screen.</li>
+        <li>Reply from the same place you keep your customers and quotes.</li>
+        <li>Pictures from senders stay hidden until you choose to show them.</li>
+      </ul>
+      <p class="note">Need a business email address first? <a href="../#services">We set that up too.</a></p>
+    </div>
+
+  </div>
+</section>
+
+<section style="padding-top: 0;">
+  <div class="bundle reveal">
+    <div>
+      <div class="section-label">Ops Essentials</div>
+      <div class="section-title">Get all three together.</div>
+      <p>Ops Essentials is all three tools under one login, set up together. It costs less than adding them one at a time. Ask us and we'll quote it for your business.</p>
+    </div>
+    <div class="bundle-list">
+      <div class="bundle-item">Ops Customers <span>Customers and requests</span></div>
+      <div class="bundle-item">Ops Quotes <span>Quotes and saved prices</span></div>
+      <div class="bundle-item">Ops Inbox <span>Your business email</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="steps-section" id="how">
+  <div style="max-width: 1100px; margin: 0 auto;">
+    <div class="section-label reveal stagger" style="--i:0">Getting Started</div>
+    <div class="section-title reveal stagger" style="--i:1">We set it up. You use it.</div>
+    <p class="section-sub reveal stagger" style="--i:2">No software to install and nothing to configure on your end.</p>
+    <div class="steps">
+      <div class="step reveal stagger" style="--i:0">
+        <div class="step-num">01</div>
+        <h3>We talk</h3>
+        <p>Tell us how you handle customers, quotes and email today, and what slows you down.</p>
+      </div>
+      <div class="step reveal stagger" style="--i:1">
+        <div class="step-num">02</div>
+        <h3>We set it up</h3>
+        <p>Your name, logo and colors, your services and prices, and your terms, all loaded in for you.</p>
+      </div>
+      <div class="step reveal stagger" style="--i:2">
+        <div class="step-num">03</div>
+        <h3>You log in</h3>
+        <p>Use it from your phone, tablet or computer. We walk you through it the first time.</p>
+      </div>
+      <div class="step reveal stagger" style="--i:3">
+        <div class="step-num">04</div>
+        <h3>We keep it running</h3>
+        <p>Updates, backups and help when you need it are part of the monthly plan.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="section-label reveal stagger" style="--i:0">Questions</div>
+  <div class="section-title reveal stagger" style="--i:1">Good to know.</div>
+  <div class="faq" style="margin-top: 2rem;">
+    <div class="reveal stagger" style="--i:0">
+      <h3>Do I need to install anything?</h3>
+      <p>No. It runs in your web browser. Log in from any phone, tablet or computer.</p>
+    </div>
+    <div class="reveal stagger" style="--i:1">
+      <h3>Can I start with just one?</h3>
+      <p>Yes. Each tool works on its own. You can add the others later without starting over.</p>
+    </div>
+    <div class="reveal stagger" style="--i:2">
+      <h3>Will it look like my business?</h3>
+      <p>Yes. It carries your business name, logo and colors, and so do your quotes.</p>
+    </div>
+    <div class="reveal stagger" style="--i:3">
+      <h3>Does it work with my website?</h3>
+      <p>If we build or look after your website, its contact form can send requests straight into Ops Customers.</p>
+    </div>
+  </div>
+</section>
+
+<div class="contact-section cta-band">
+  <div style="max-width: 1100px; margin: 0 auto;">
+    <div class="section-label reveal stagger" style="--i:0">Get Started</div>
+    <div class="section-title reveal stagger" style="--i:1; color: #fafaf8;">Want to see if it fits your business?</div>
+    <p class="section-sub reveal stagger" style="--i:2">Send us a note about how you work now. We'll get back to you within 24 hours with a free, no-obligation quote.</p>
+    <a href="../#contact" class="btn-primary reveal stagger" style="--i:3">Get in touch</a>
+  </div>
+</div>
+
+<footer>
+  <p>© 2026 Modern Ops · modern-ops.net · Delaware Valley, PA</p>
+</footer>
+
+<script>
+  /* Scroll-reveal via IntersectionObserver (no libraries).
+     Falls back to showing everything if IO is unsupported or the
+     visitor prefers reduced motion. */
+  (function () {
+    var els = document.querySelectorAll('.reveal');
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (reduce || !('IntersectionObserver' in window)) {
+      for (var i = 0; i < els.length; i++) { els[i].classList.add('in-view'); }
+      return;
+    }
+
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+    els.forEach(function (el) { io.observe(el); });
+  })();
+</script>
+
+</body>
+</html>

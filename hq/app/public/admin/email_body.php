@@ -1,8 +1,10 @@
 <?php
 /** The HTML body of one email, shown inside a sandboxed iframe on the Email tab. */
 require_once __DIR__ . '/_auth.php';
+require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_imap.php';
 require_login();
+require_product('inbox');
 
 $images = !empty($_GET['img']);
 $img = $images ? "data: https: http:" : "data:";

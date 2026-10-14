@@ -22,6 +22,7 @@ RUN composer install --no-dev --no-interaction --prefer-dist --no-progress
 
 COPY public/ /var/www/html/public/
 COPY lib/ /var/www/html/lib/
+COPY clients/ /var/www/html/clients/
 RUN chown -R www-data:www-data /var/www/html
 
 EXPOSE 80

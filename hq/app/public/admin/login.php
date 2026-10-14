@@ -1,6 +1,7 @@
 <?php
 /** Admin login — standalone themed page (dark/light, mobile). */
 require_once __DIR__ . '/_auth.php';
+require_once __DIR__ . '/_brand.php';
 
 // If not set up yet, send to setup.
 if (!schema_ready()) { header('Location: setup.php'); exit; }
@@ -46,21 +47,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>Log in · Modern Ops HQ</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231a6b4a'/%3E%3Ctext%20x='16'%20y='21.5'%20font-family='Georgia,serif'%20font-size='16'%20font-weight='700'%20text-anchor='middle'%3E%3Ctspan%20fill='%231a1a1a'%3EM%3C/tspan%3E%3Ctspan%20fill='%23ffffff'%3EO%3C/tspan%3E%3C/text%3E%3C/svg%3E">
+<title>Log in · <?= e(brand_title()) ?></title>
+<link rel="icon" href="<?= e(brand_favicon()) ?>">
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   :root{
     --bg:#eef0ec;--surface:#ffffff;--text:#1a1a1a;--muted:#5a5a5a;--border:#e2e2dd;
-    --accent:#1a6b4a;--accent-text:#ffffff;--field:#ffffff;--field-border:#d7d7d1;--shadow:0 10px 40px rgba(0,0,0,.08)
+    --accent:<?= brand_color('accent', '#1a6b4a') ?>;--accent-text:#ffffff;--field:#ffffff;--field-border:#d7d7d1;--shadow:0 10px 40px rgba(0,0,0,.08)
   }
   :root[data-theme="dark"]{
     --bg:#11161a;--surface:#1b2328;--text:#eef1ee;--muted:#9fb0aa;--border:#2a353b;
-    --accent:#35b082;--accent-text:#06130d;--field:#131a1f;--field-border:#30404a;--shadow:0 10px 40px rgba(0,0,0,.45)
+    --accent:<?= brand_color('accent_dark', '#35b082') ?>;--accent-text:#06130d;--field:#131a1f;--field-border:#30404a;--shadow:0 10px 40px rgba(0,0,0,.45)
   }
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
     --bg:#11161a;--surface:#1b2328;--text:#eef1ee;--muted:#9fb0aa;--border:#2a353b;
-    --accent:#35b082;--accent-text:#06130d;--field:#131a1f;--field-border:#30404a;--shadow:0 10px 40px rgba(0,0,0,.45)
+    --accent:<?= brand_color('accent_dark', '#35b082') ?>;--accent-text:#06130d;--field:#131a1f;--field-border:#30404a;--shadow:0 10px 40px rgba(0,0,0,.45)
   }}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.25rem}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);width:100%;max-width:400px;padding:2.25rem 2rem}
@@ -82,8 +83,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
 <button class="themebtn" id="themebtn" type="button" aria-label="Toggle theme">◐</button>
 <div class="card">
-  <div class="logo"><span class="m">M</span><span class="o">O</span></div>
-  <h1>Modern Ops HQ</h1>
+  <?= brand_mark_html() ?>
+  <h1><?= e(brand_title()) ?></h1>
   <div class="tag">Private dashboard — authorized access only</div>
   <?php if ($err): ?><div class="err"><?= e($err) ?></div><?php endif; ?>
   <form method="post">
@@ -94,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <input id="p" type="password" name="password" autocomplete="current-password" required>
     <button type="submit">Log in</button>
   </form>
-  <div class="foot">Modern Ops · Delaware Valley, PA</div>
+  <div class="foot"><?= e(client('name')) ?><?= client('location') ? ' · ' . e(client('location')) : '' ?></div>
 </div>
 <script>
   (function(){

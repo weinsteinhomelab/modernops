@@ -19,7 +19,7 @@ function site_clean_url(string $u): string {
 
 /** Client previews currently listed on the public /demos/ hub (cached 10 min). */
 function demo_suggestions(): array {
-    $origin = rtrim(defined('SITE_ORIGIN') ? SITE_ORIGIN : 'https://modern-ops.net', '/');
+    $origin = rtrim(SITE_ORIGIN, '/');
     $hub = $origin . '/demos/';
     $cache = sys_get_temp_dir() . '/mohq-demos.json';
     if (is_file($cache) && filemtime($cache) > time() - 600) {

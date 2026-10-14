@@ -23,6 +23,10 @@ header('Access-Control-Allow-Headers: Content-Type');
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { http_response_code(204); exit; }
 
 header('Content-Type: application/json');
+// Website requests are part of Ops Customers.
+if (!product_on('customers')) {
+    http_response_code(404); echo json_encode(['ok' => false, 'error' => 'not enabled']); exit;
+}
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     http_response_code(405); echo json_encode(['ok' => false, 'error' => 'method']); exit;
 }

@@ -56,7 +56,9 @@ is never lost.
   - `backup` (nightly `mysqldump` into `hq/backup/`)
   - `cloudflared` (the tunnel) lives in `hq/docker-compose.override.yml` (gitignored).
 - **Secrets/config:** `hq/.env` (gitignored) — DB passwords, `APP_SECRET`,
-  `SMTP_PASS` (shared mailbox password), `TUNNEL_TOKEN`, IMAP/accounts, quote mailbox.
+  `SMTP_PASS` (shared mailbox password), `TUNNEL_TOKEN`, `CLIENT=modernops`.
+  Names, email addresses, mail hosts, colors, quote wording and terms live in
+  `hq/app/clients/modernops.php` (see BUILD_GUIDE.md).
   A copy of DB creds is saved at `/DATA/.secrets/modernops-hq.env`.
 - **App login:** single admin (`peter` / password), created at first-run setup;
   password hash in the `admin_users` table. Brute-force throttle + security headers.

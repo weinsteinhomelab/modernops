@@ -1,45 +1,54 @@
 <?php
 /** Shared page chrome for the admin dashboard (dark/light, mobile). */
+require_once __DIR__ . '/_brand.php';
 
 function layout_header(string $title, string $active = ''): void {
-    $site = defined('SITE_ORIGIN') ? SITE_ORIGIN : 'https://modern-ops.net';
-    $nav = [
-        'index.php'     => 'Dashboard',
-        'requests.php'  => 'Requests',
-        'customers.php' => 'Customers',
-        'quotes.php'    => 'Quotes',
-        'catalog.php'   => 'Catalog',
-        'email.php'     => 'Email',
-        rtrim($site, '/') . '/demos/' => 'Previews',
-    ];
+    // Nav follows the products this client has; the title attribute names the product.
+    $nav = ['index.php' => ['Dashboard', '']];
+    if (product_on('customers')) {
+        $nav['requests.php']  = ['Requests', product_name('customers')];
+        $nav['customers.php'] = ['Customers', product_name('customers')];
+    }
+    if (product_on('quotes')) {
+        // Quotes need someone to quote, so the customer list comes with Ops Quotes too.
+        if (!product_on('customers')) $nav['customers.php'] = ['Customers', product_name('quotes')];
+        $nav['quotes.php']  = ['Quotes', product_name('quotes')];
+        $nav['catalog.php'] = ['Catalog', product_name('quotes')];
+    }
+    if (product_on('inbox')) $nav['email.php'] = ['Inbox', product_name('inbox')];
+    if (client('previews')) $nav[rtrim(SITE_ORIGIN, '/') . '/demos/'] = ['Previews', ''];
+    $accent = brand_color('accent', '#1a6b4a');
+    $accentDark = brand_color('accent_dark', '#35b082');
+    $tint = brand_color('tint', '#e8f4ee');
     ?><!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title><?= e($title) ?> · Modern Ops HQ</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231a6b4a'/%3E%3Ctext%20x='16'%20y='21.5'%20font-family='Georgia,serif'%20font-size='16'%20font-weight='700'%20text-anchor='middle'%3E%3Ctspan%20fill='%231a1a1a'%3EM%3C/tspan%3E%3Ctspan%20fill='%23ffffff'%3EO%3C/tspan%3E%3C/text%3E%3C/svg%3E">
+<title><?= e($title) ?> · <?= e(brand_title()) ?></title>
+<link rel="icon" href="<?= e(brand_favicon()) ?>">
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   :root{
     --bg:#f4f3ef;--surface:#fff;--surface-2:#faf9f6;--text:#1a1a1a;--muted:#5a5a5a;--border:#e2e2dd;
-    --accent:#1a6b4a;--accent-text:#fff;--field:#fff;--field-border:#d7d7d1;--topbar:#1a1a1a;--topbar-text:#fff;--topbar-dim:#cfcfcf
+    --accent:<?= $accent ?>;--accent-dark:<?= $accentDark ?>;--tint:<?= $tint ?>;--accent-text:#fff;--field:#fff;--field-border:#d7d7d1;--topbar:#1a1a1a;--topbar-text:#fff;--topbar-dim:#cfcfcf
   }
   :root[data-theme="dark"]{
     --bg:#11161a;--surface:#1b2328;--surface-2:#161d22;--text:#eef1ee;--muted:#9fb0aa;--border:#2a353b;
-    --accent:#35b082;--accent-text:#06130d;--field:#131a1f;--field-border:#30404a;--topbar:#0c1114;--topbar-text:#eef1ee;--topbar-dim:#8fa29b
+    --accent:<?= $accentDark ?>;--accent-text:#06130d;--field:#131a1f;--field-border:#30404a;--topbar:#0c1114;--topbar-text:#eef1ee;--topbar-dim:#8fa29b
   }
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
     --bg:#11161a;--surface:#1b2328;--surface-2:#161d22;--text:#eef1ee;--muted:#9fb0aa;--border:#2a353b;
-    --accent:#35b082;--accent-text:#06130d;--field:#131a1f;--field-border:#30404a;--topbar:#0c1114;--topbar-text:#eef1ee;--topbar-dim:#8fa29b
+    --accent:<?= $accentDark ?>;--accent-text:#06130d;--field:#131a1f;--field-border:#30404a;--topbar:#0c1114;--topbar-text:#eef1ee;--topbar-dim:#8fa29b
   }}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.55}
   a{color:var(--accent);text-decoration:none}
   a:hover{text-decoration:underline}
   header.topbar{background:var(--topbar);color:var(--topbar-text);padding:0 5%;display:flex;align-items:center;justify-content:space-between;min-height:56px;position:sticky;top:0;z-index:50;flex-wrap:wrap;gap:.5rem}
   .brand{font-family:Georgia,serif;font-weight:700;font-size:1.05rem;color:var(--topbar-text);text-decoration:none}
-  .brand b{color:#5fcfa0}
+  .brand b{color:<?= brand_color('highlight', '#5fcfa0') ?>}
+  .brand img{max-height:32px;display:block}
   nav.main{display:flex;gap:.25rem;align-items:center;flex-wrap:wrap}
   nav.main a{color:var(--topbar-dim);padding:.5rem .9rem;border-radius:6px;font-size:.9rem;font-weight:500}
   nav.main a:hover{background:rgba(255,255,255,.08);color:#fff;text-decoration:none}
@@ -59,14 +68,14 @@ function layout_header(string $title, string $active = ''): void {
   td{padding:.7rem .6rem;border-bottom:1px solid var(--border);vertical-align:top}
   tr:last-child td{border-bottom:none}
   .badge{display:inline-block;font-size:.72rem;font-weight:700;padding:.18rem .55rem;border-radius:20px;text-transform:uppercase;letter-spacing:.03em}
-  .badge.new{background:#e8f4ee;color:#1a6b4a}
+  .badge.new{background:var(--tint);color:<?= $accent ?>}
   .badge.contacted{background:#fff3d6;color:#8a6d1a}
   .badge.quoted{background:#e0ecff;color:#2451b0}
-  .badge.won{background:#1a6b4a;color:#fff}
+  .badge.won{background:var(--accent);color:var(--accent-text)}
   .badge.closed{background:#e6e6e6;color:#777}
   .badge.draft{background:#e6e6e6;color:#777}
   .badge.sent{background:#e0ecff;color:#2451b0}
-  .badge.accepted{background:#1a6b4a;color:#fff}
+  .badge.accepted{background:var(--accent);color:var(--accent-text)}
   .badge.declined{background:#fde2e2;color:#b02424}
   .btn{display:inline-block;background:var(--accent);color:var(--accent-text);padding:.55rem 1.1rem;border-radius:7px;font-weight:600;font-size:.88rem;border:none;cursor:pointer;font-family:inherit}
   .btn:hover{opacity:.9;text-decoration:none}
@@ -79,7 +88,7 @@ function layout_header(string $title, string $active = ''): void {
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 1rem}
   .row-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
   .flash{padding:.7rem 1rem;border-radius:8px;margin-bottom:1.25rem;font-size:.9rem}
-  .flash.ok{background:rgba(26,107,74,.12);color:var(--accent);border:1px solid rgba(26,107,74,.3)}
+  .flash.ok{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent)}
   .flash.err{background:rgba(176,36,36,.12);color:#c0392b;border:1px solid rgba(176,36,36,.3)}
   .muted{color:var(--muted)}
   .empty{text-align:center;color:var(--muted);padding:2.5rem 1rem}
@@ -89,10 +98,10 @@ function layout_header(string $title, string $active = ''): void {
 <body>
 <header class="topbar">
   <div style="display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap">
-    <a class="brand" href="index.php">Modern Ops <b>HQ</b></a>
+    <a class="brand" href="index.php"><?php if (client('logo')): ?><img src="<?= e(client('logo')) ?>" alt="<?= e(brand_title()) ?>"><?php else: ?><?= e(client('name')) ?> <b><?= e(client('portal', '')) ?></b><?php endif; ?></a>
     <nav class="main">
-      <?php foreach ($nav as $href => $label): $ext = (strncmp($href, 'http', 4) === 0); ?>
-        <a href="<?= e($href) ?>"<?= $active === $href ? ' class="active"' : '' ?><?= $ext ? ' target="_blank" rel="noopener"' : '' ?>><?= $label ?><?= $ext ? ' <span aria-hidden="true" style="opacity:.6;font-size:.8em">&#8599;</span>' : '' ?></a>
+      <?php foreach ($nav as $href => [$label, $prod]): $ext = (strncmp($href, 'http', 4) === 0); ?>
+        <a href="<?= e($href) ?>"<?= $prod ? ' title="' . e($prod) . '"' : '' ?><?= $active === $href ? ' class="active"' : '' ?><?= $ext ? ' target="_blank" rel="noopener"' : '' ?>><?= $label ?><?= $ext ? ' <span aria-hidden="true" style="opacity:.6;font-size:.8em">&#8599;</span>' : '' ?></a>
       <?php endforeach; ?>
     </nav>
   </div>

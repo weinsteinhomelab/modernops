@@ -4,6 +4,7 @@ require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_verticals.php';
 require_login();
+require_product('customers', 'quotes');
 
 $id = (int)($_GET['id'] ?? 0);
 $b = ['id'=>0,'name'=>'','vertical'=>'','main_phone'=>'','main_email'=>'','address'=>'','address2'=>'','city'=>'','state'=>'','country'=>'United States','zip'=>'','notes'=>''];

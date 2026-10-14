@@ -4,6 +4,7 @@ require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_sites.php';
 require_login();
+require_product('customers', 'quotes');
 
 $id = (int)($_GET['id'] ?? 0);
 $st = db()->prepare('SELECT * FROM businesses WHERE id = ?');
@@ -122,7 +123,7 @@ layout_header($b['name'], 'customers.php');
   <form method="post" class="site-add" style="display:grid;grid-template-columns:110px 1fr 1fr auto;gap:.5rem;align-items:center;margin-top:1rem">
     <?= csrf_field() ?><input type="hidden" name="action" value="add_site">
     <select name="kind"><option value="demo">Demo</option><option value="live">Live</option></select>
-    <input type="text" name="url" list="demo-urls" placeholder="Website address, e.g. modern-ops.net/demos/doggy-spa/" required>
+    <input type="text" name="url" list="demo-urls" placeholder="Website address, e.g. <?= e(client('domain')) ?>" required>
     <input type="text" name="label" placeholder="Label (optional)">
     <button class="btn" type="submit">Add</button>
     <datalist id="demo-urls"><?php foreach ($demoUrls as $u): ?><option value="<?= e($u) ?>"><?php endforeach; ?></datalist>

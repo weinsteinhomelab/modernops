@@ -1,0 +1,71 @@
+name: Deploy Ops Essentials (client HQ) to SiteGround
+
+# Manual only. Actions -> "Deploy Ops Essentials" -> Run workflow, then enter the
+# client slug (file name in hq/app/clients/, no .php) and the SiteGround site
+# folder (the name under ~/www/, e.g. hq.clientdomain.com).
+# Uses the same SSH_* secrets as the website deploy (one SiteGround account).
+# Never uploads .env; that file is created once on the server by hand.
+
+on:
+  workflow_dispatch:
+    inputs:
+      client:
+        description: "Client slug (hq/app/clients/<slug>.php)"
+        required: true
+      site:
+        description: "SiteGround site folder under ~/www/ (e.g. hq.clientdomain.com)"
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check inputs
+        env:
+          CLIENT: ${{ inputs.client }}
+          SITE: ${{ inputs.site }}
+        run: |
+          set -e
+          echo "$CLIENT" | grep -Eq '^[a-z0-9][a-z0-9_-]*$' || { echo "::error::Bad client slug"; exit 1; }
+          echo "$SITE" | grep -Eq '^[a-z0-9][a-z0-9.-]*$' || { echo "::error::Bad site folder"; exit 1; }
+          test -f "hq/app/clients/$CLIENT.php" || { echo "::error::hq/app/clients/$CLIENT.php not found"; exit 1; }
+
+      - name: Install PHP libraries (vendor/)
+        run: docker run --rm -v "$PWD/hq/app:/app" -w /app composer:2 install --no-dev --no-interaction --prefer-dist --ignore-platform-reqs
+
+      - name: Upload over SSH
+        env:
+          CLIENT: ${{ inputs.client }}
+          SITE: ${{ inputs.site }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_PASSPHRASE: ${{ secrets.SSH_PASSPHRASE }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_key && chmod 600 ~/.ssh/id_key
+          ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          eval "$(ssh-agent -s)"
+          if [ -n "$SSH_PASSPHRASE" ]; then
+            printf '#!/usr/bin/env bash\necho "$SSH_PASSPHRASE"\n' > ~/.ssh/askpass.sh && chmod +x ~/.ssh/askpass.sh
+            DISPLAY=:0 SSH_ASKPASS="$HOME/.ssh/askpass.sh" SSH_ASKPASS_REQUIRE=force setsid -w ssh-add ~/.ssh/id_key
+            rm -f ~/.ssh/askpass.sh
+          else
+            ssh-add ~/.ssh/id_key
+          fi
+          DEST="$SSH_USER@$SSH_HOST:~/www/$SITE"
+          RSH="ssh -p $SSH_PORT"
+          # Web root: public/ -> public_html/
+          rsync -az -e "$RSH" hq/app/public/ "$DEST/public_html/"
+          # Code that must stay outside the web root
+          rsync -az --delete -e "$RSH" hq/app/lib/ "$DEST/lib/"
+          rsync -az --delete -e "$RSH" hq/app/vendor/ "$DEST/vendor/"
+          # Only this client's config file goes to this client's server
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "mkdir -p ~/www/$SITE/clients"
+          rsync -az -e "$RSH" "hq/app/clients/$CLIENT.php" "$DEST/clients/$CLIENT.php"
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "test -f ~/www/$SITE/.env || echo '::warning::~/www/$SITE/.env is missing. Create it before opening the site.'"
+          ssh-agent -k >/dev/null 2>&1 || true

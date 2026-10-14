@@ -4,6 +4,7 @@ require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_billing.php';
 require_login();
+require_product('quotes');
 
 $id = (int)($_GET['id'] ?? 0);
 $quote = null;
@@ -102,13 +103,13 @@ $catalog = db()->query("SELECT title, description, unit_price, billing FROM cata
 
 $preBusiness = (int)($_GET['business'] ?? ($quote['business_id'] ?? 0));
 $preContact  = (int)($quote['contact_id'] ?? 0);
-$defNumber = $quote['quote_number'] ?? (string)setting('next_quote_number', '1001');
+$defNumber = $quote['quote_number'] ?? (string)setting('next_quote_number', (string) client('quotes.first_number', '1001'));
 $defIssue  = $quote['issue_date'] ?? date('Y-m-d');
-$defValid  = $quote['valid_until'] ?? date('Y-m-d', strtotime('+30 days'));
-$defTaxRate = $quote['tax_rate'] ?? setting('default_tax_rate', '0');
-$defTaxLabel = $quote['tax_label'] ?? setting('default_tax_label', 'Sales Tax');
+$defValid  = $quote['valid_until'] ?? date('Y-m-d', strtotime('+' . (int) client('quotes.valid_days', 30) . ' days'));
+$defTaxRate = $quote['tax_rate'] ?? client('quotes.tax_rate', '0');
+$defTaxLabel = $quote['tax_label'] ?? client('quotes.tax_label', 'Sales Tax');
 $defScope = $quote['scope_of_work'] ?? '';
-$defNotes = $quote['notes'] ?? "Quote valid for 30 days from issue date. Payment due upon acceptance.";
+$defNotes = $quote['notes'] ?? (string) client('quotes.notes', '');
 $termsChecked = !isset($quote['terms_included']) || $quote['terms_included'] ? 'checked' : '';
 
 layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
@@ -233,7 +234,7 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
     {label:"FL — 6%", rate:"6", name:"FL Sales Tax"}
   ];
 
-  var DEFAULT_MARGIN = <?= json_encode((string)setting('default_margin', '30')) ?>;
+  var DEFAULT_MARGIN = <?= json_encode((string) client('quotes.margin', '30')) ?>;
   var PERIODS = <?= json_encode(billing_periods(), JSON_UNESCAPED_SLASHES) ?>; // key => [label, suffix, months, box title]
   function months(b){return (PERIODS[b]||PERIODS.one_time)[2];}
   function suffix(b){return (PERIODS[b]||PERIODS.one_time)[1];}
@@ -320,7 +321,7 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
     row.innerHTML = MOVER +
       '<input name="item_title[]" placeholder="Title" value="'+esc(it.title)+'">'+
       '<input name="item_qty[]" type="number" min="0" step="1" value="'+(parseFloat(it.qty)||1)+'" style="text-align:center">'+
-      '<input name="item_cost[]" type="number" min="0" step="0.01" placeholder="Our cost" title="What this costs Modern Ops (per unit, never shown to the customer)" value="'+esc(num(it.cost))+'">'+
+      '<input name="item_cost[]" type="number" min="0" step="0.01" placeholder="Our cost" title="What this costs <?= e(client('name')) ?> (per unit, never shown to the customer)" value="'+esc(num(it.cost))+'">'+
       '<input name="item_margin[]" type="number" step="0.1" placeholder="%" title="Margin % added on top of our cost" value="'+esc(num(it.margin))+'">'+
       '<input name="item_price[]" type="number" min="0" step="0.01" title="Total cost to the customer, per unit. Editing this updates the margin." value="'+(it.price||0)+'">'+
       '<select name="item_billing[]">'+Object.keys(PERIODS).map(function(k){return '<option value="'+k+'"'+((it.billing||'one_time')===k?' selected':'')+'>'+PERIODS[k][0]+'</option>';}).join('')+'</select>'+

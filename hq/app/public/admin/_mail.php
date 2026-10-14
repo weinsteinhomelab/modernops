@@ -32,11 +32,11 @@ function smtp_deliver(string $to, string $message, ?string $authUser = null, ?st
 
     try {
         if ($code($read()) !== 220) { fclose($fp); return false; }
-        if ($code($cmd('EHLO modern-ops.net')) !== 250) { fclose($fp); return false; }
+        if ($code($cmd('EHLO ' . client('domain'))) !== 250) { fclose($fp); return false; }
         if (SMTP_SECURE === 'tls') {
             if ($code($cmd('STARTTLS')) !== 220) { fclose($fp); return false; }
             if (!stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) { fclose($fp); return false; }
-            $cmd('EHLO modern-ops.net');
+            $cmd('EHLO ' . client('domain'));
         }
         if ($code($cmd('AUTH LOGIN')) !== 334) { fclose($fp); return false; }
         if ($code($cmd(base64_encode($authUser))) !== 334) { fclose($fp); return false; }

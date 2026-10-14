@@ -4,19 +4,9 @@ require_once __DIR__ . '/_db.php';
 
 const SCHEMA_VERSION = 6;
 
-/** The standard Modern Ops service catalog (from the quote template). */
+/** Starting pricebook for an empty Catalog: the "catalog" list in the client file. */
 function catalog_defaults(): array {
-    return [
-        ['Website Design & Setup', 'Custom website, hosting configuration, domain setup, SSL', 350.00, 'one_time'],
-        ['Business Email Setup', 'Professional email address at your domain', 0.00, 'one_time'],
-        ['Domain Registration', 'Annual: 1-year domain registration', 15.00, 'one_time'],
-        ['Hosting', 'Annual: managed website hosting', 60.00, 'one_time'],
-        ['Google Business Profile Setup', 'Create and optimize your Google Business listing', 0.00, 'one_time'],
-        ['Social Media Profile Setup', 'Create and brand your social media pages', 0.00, 'one_time'],
-        ['Additional Email Account Setup', 'Extra email addresses at your domain', 0.00, 'one_time'],
-        ['Site Maintenance', 'Security patches, uptime monitoring, backups', 70.00, 'monthly'],
-        ['Site Maintenance & Content Updates', 'Everything in maintenance plus text and photo updates', 120.00, 'monthly'],
-    ];
+    return (array) client('catalog', []);
 }
 
 function seed_catalog(): void {
@@ -29,9 +19,9 @@ function seed_catalog(): void {
 }
 
 function seed_defaults(): void {
-    if (setting('next_quote_number') === null) set_setting('next_quote_number', '1001');
-    if (setting('default_tax_rate') === null)  set_setting('default_tax_rate', '0');
-    if (setting('default_tax_label') === null) set_setting('default_tax_label', 'Sales Tax');
+    if (setting('next_quote_number') === null) set_setting('next_quote_number', (string) client('quotes.first_number', '1001'));
+    if (setting('default_tax_rate') === null)  set_setting('default_tax_rate', (string) client('quotes.tax_rate', '0'));
+    if (setting('default_tax_label') === null) set_setting('default_tax_label', (string) client('quotes.tax_label', 'Sales Tax'));
 }
 
 function run_phase2_migration(): void {

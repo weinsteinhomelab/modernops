@@ -4,27 +4,15 @@ services:
     restart: unless-stopped
     ports:
       - "${APP_PORT:-8090}:80"
+    # Secrets + infrastructure only. Everything client-specific is in
+    # app/clients/<CLIENT>.php.
     environment:
+      CLIENT: ${CLIENT:-modernops}
       DB_HOST: db
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
-      NOTIFY_EMAIL: ${NOTIFY_EMAIL}
-      SITE_ORIGIN: ${SITE_ORIGIN}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      SMTP_SECURE: ${SMTP_SECURE}
-      SMTP_USER: ${SMTP_USER}
       SMTP_PASS: ${SMTP_PASS}
-      MAIL_FROM: ${MAIL_FROM}
-      MAIL_FROM_NAME: ${MAIL_FROM_NAME}
-      QUOTE_SMTP_USER: ${QUOTE_SMTP_USER:-quote@modern-ops.net}
-      QUOTE_MAIL_FROM: ${QUOTE_MAIL_FROM:-quote@modern-ops.net}
-      QUOTE_MAIL_FROM_NAME: ${QUOTE_MAIL_FROM_NAME:-Modern Ops Quotes}
-      IMAP_HOST: ${IMAP_HOST:-mail.modern-ops.net}
-      IMAP_PORT: ${IMAP_PORT:-993}
-      IMAP_ENCRYPTION: ${IMAP_ENCRYPTION:-ssl}
-      MAIL_ACCOUNTS: ${MAIL_ACCOUNTS:-peter@modern-ops.net,info@modern-ops.net,service@modern-ops.net,quote@modern-ops.net}
       APP_SECRET: ${APP_SECRET}
     depends_on:
       - db
