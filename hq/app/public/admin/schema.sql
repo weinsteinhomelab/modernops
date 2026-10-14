@@ -90,7 +90,9 @@ CREATE TABLE IF NOT EXISTS quote_items (
   description VARCHAR(255) DEFAULT NULL,
   quantity    DECIMAL(10,2) NOT NULL DEFAULT 1,
   unit_price  DECIMAL(10,2) NOT NULL DEFAULT 0,
-  billing     ENUM('one_time','monthly') NOT NULL DEFAULT 'one_time',
+  unit_cost   DECIMAL(10,2) DEFAULT NULL,
+  margin      DECIMAL(8,2) DEFAULT NULL,
+  billing     ENUM('one_time','monthly','quarterly','semiannual','annual') NOT NULL DEFAULT 'one_time',
   sort_order  INT NOT NULL DEFAULT 0,
   INDEX (quote_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -100,7 +102,7 @@ CREATE TABLE IF NOT EXISTS catalog_items (
   title       VARCHAR(190) NOT NULL,
   description VARCHAR(255) DEFAULT NULL,
   unit_price  DECIMAL(10,2) NOT NULL DEFAULT 0,
-  billing     ENUM('one_time','monthly') NOT NULL DEFAULT 'one_time',
+  billing     ENUM('one_time','monthly','quarterly','semiannual','annual') NOT NULL DEFAULT 'one_time',
   active      TINYINT NOT NULL DEFAULT 1,
   sort_order  INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -2,6 +2,7 @@
 /** Build or edit a quote. */
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
+require_once __DIR__ . '/_billing.php';
 require_login();
 
 $id = (int)($_GET['id'] ?? 0);
@@ -38,6 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $qtys    = $_POST['item_qty']     ?? [];
     $prices  = $_POST['item_price']   ?? [];
     $bills   = $_POST['item_billing'] ?? [];
+    $costs   = $_POST['item_cost']    ?? [];
+    $margins = $_POST['item_margin']  ?? [];
 
     if (!$business_id) {
         $err = 'Please choose a business.';
@@ -61,16 +64,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     set_setting('next_quote_number', (string)((int)$quote_number + 1));
                 }
             }
-            $li = $pdo->prepare('INSERT INTO quote_items (quote_id, title, description, quantity, unit_price, billing, sort_order) VALUES (?,?,?,?,?,?,?)');
+            $li = $pdo->prepare('INSERT INTO quote_items (quote_id, title, description, quantity, unit_price, unit_cost, margin, billing, sort_order) VALUES (?,?,?,?,?,?,?,?,?)');
             $n = count($titles);
             $order = 0;
             for ($i = 0; $i < $n; $i++) {
                 $t = trim((string)$titles[$i]);
                 if ($t === '') continue;
+                $cost = trim((string)($costs[$i] ?? '')); $mg = trim((string)($margins[$i] ?? ''));
                 $li->execute([
                     $qid, $t, trim((string)($descs[$i] ?? '')),
                     (float)($qtys[$i] ?? 1), (float)($prices[$i] ?? 0),
-                    ($bills[$i] ?? 'one_time') === 'monthly' ? 'monthly' : 'one_time',
+                    $cost === '' ? null : (float)$cost, $mg === '' ? null : (float)$mg,
+                    billing_clean($bills[$i] ?? 'one_time'),
                     $order++,
                 ]);
             }
@@ -144,13 +149,20 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
     </div>
     <div style="margin-top:.5rem"><button type="button" class="btn secondary small" id="addCustom">+ Add custom line</button></div>
 
-    <div id="lines" style="margin-top:1rem"></div>
+    <div id="lineHead" style="margin-top:1rem"><span>Item</span><span style="text-align:center">Qty</span><span>Our cost</span><span>Margin %</span><span>Total cost</span><span>Billing</span><span style="text-align:right">Line total</span><span></span></div>
+    <style>.line-row input,.line-row select{padding:.45rem .5rem;font-size:.9rem;min-width:0}.line-row [name="item_desc[]"]{grid-column:1/-2;font-size:.82rem}</style>
+    <div id="lines"></div>
 
     <div style="display:flex;justify-content:flex-end;gap:1rem;margin-top:1rem;flex-wrap:wrap">
       <div class="stat" style="padding:.6rem 1rem"><span class="l">One-time</span><div class="n" id="tOne" style="font-size:1.2rem">$0.00</div></div>
       <div class="stat" style="padding:.6rem 1rem"><span class="l">Tax</span><div class="n" id="tTax" style="font-size:1.2rem">$0.00</div></div>
       <div class="stat" style="padding:.6rem 1rem"><span class="l">One-time total</span><div class="n" id="tOneTotal" style="font-size:1.2rem">$0.00</div></div>
-      <div class="stat" style="padding:.6rem 1rem"><span class="l">Monthly</span><div class="n" id="tMo" style="font-size:1.2rem">$0.00</div></div>
+      <div class="stat" style="padding:.6rem 1rem"><span class="l">Recurring</span><div class="n" id="tMo" style="font-size:1.2rem;line-height:1.35">$0.00/mo</div></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:1rem;margin-top:.6rem;flex-wrap:wrap;align-items:center">
+      <span class="muted" style="font-size:.78rem">Internal only, never shown to the customer:</span>
+      <div class="stat" style="padding:.6rem 1rem"><span class="l">Our cost</span><div class="n" id="tCost" style="font-size:1.2rem;line-height:1.35;color:var(--muted)">$0.00</div></div>
+      <div class="stat" style="padding:.6rem 1rem"><span class="l">Profit</span><div class="n" id="tProfit" style="font-size:1.2rem;line-height:1.35">$0.00</div></div>
     </div>
   </div>
 
@@ -179,7 +191,7 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
 
 <script>
   var CATALOG = <?= json_encode($catalog, JSON_UNESCAPED_SLASHES) ?>;
-  var INITIAL = <?= json_encode(array_map(function($r){return ['title'=>$r['title'],'desc'=>$r['description'],'qty'=>$r['quantity'],'price'=>$r['unit_price'],'billing'=>$r['billing']];}, $items), JSON_UNESCAPED_SLASHES) ?>;
+  var INITIAL = <?= json_encode(array_map(function($r){return ['title'=>$r['title'],'desc'=>$r['description'],'qty'=>$r['quantity'],'price'=>$r['unit_price'],'cost'=>$r['unit_cost'] ?? null,'margin'=>$r['margin'] ?? null,'billing'=>$r['billing']];}, $items), JSON_UNESCAPED_SLASHES) ?>;
   var TAX_PRESETS = [
     {label:"Custom / none", rate:"", name:""},
     {label:"PA — 6%", rate:"6", name:"PA Sales Tax"},
@@ -190,6 +202,11 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
     {label:"TX — 6.25%", rate:"6.25", name:"TX Sales Tax"},
     {label:"FL — 6%", rate:"6", name:"FL Sales Tax"}
   ];
+
+  var DEFAULT_MARGIN = <?= json_encode((string)setting('default_margin', '30')) ?>;
+  var PERIODS = <?= json_encode(billing_periods(), JSON_UNESCAPED_SLASHES) ?>; // key => [label, suffix, months, box title]
+  function months(b){return (PERIODS[b]||PERIODS.one_time)[2];}
+  function suffix(b){return (PERIODS[b]||PERIODS.one_time)[1];}
 
   var CONTACTS = <?= json_encode($allContacts, JSON_UNESCAPED_SLASHES) ?>;
   var PRE_CONTACT = <?= (int)$preContact ?>;
@@ -213,7 +230,7 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
   fillContacts();
 
   var cp = document.getElementById('catalogPick');
-  CATALOG.forEach(function(c,i){var o=document.createElement('option');o.value=i;o.textContent=c.title+' — $'+Number(c.unit_price).toFixed(2)+(c.billing==='monthly'?'/mo':'');cp.appendChild(o);});
+  CATALOG.forEach(function(c,i){var o=document.createElement('option');o.value=i;o.textContent=c.title+' — $'+Number(c.unit_price).toFixed(2)+suffix(c.billing);cp.appendChild(o);});
   if(!CATALOG.length){var o=document.createElement('option');o.textContent='(no saved items yet)';cp.appendChild(o);}
 
   var tp = document.getElementById('taxPreset');
@@ -221,40 +238,81 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
   tp.addEventListener('change',function(){var p=TAX_PRESETS[tp.value];if(p && p.rate!==''){document.getElementById('taxRate').value=p.rate;document.getElementById('taxLabel').value=p.name;recalc();}});
 
   var lines = document.getElementById('lines');
+  var COLS = 'grid-template-columns:2fr .6fr .95fr .8fr .95fr 1.15fr .95fr auto';
+  document.getElementById('lineHead').style.cssText = 'display:grid;'+COLS+';gap:.4rem;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding-bottom:.2rem;border-bottom:1px solid var(--border)';
+  function r2(n){return (Math.round(n*100)/100).toFixed(2);}
+  function num(v){return v===null||v===undefined||String(v).trim()===''?'':String(parseFloat(v));}
   function addLine(it){
-    it = it || {title:'',desc:'',qty:1,price:0,billing:'one_time'};
+    it = it || {title:'',desc:'',qty:1,price:0,cost:'',margin:DEFAULT_MARGIN,billing:'one_time'};
     var row = document.createElement('div');
     row.className='line-row';
-    row.style.cssText='display:grid;grid-template-columns:1.5fr 2.1fr .5fr .8fr .9fr auto;gap:.4rem;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--border)';
+    row.style.cssText='display:grid;'+COLS+';gap:.4rem;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--border)';
     row.innerHTML =
       '<input name="item_title[]" placeholder="Title" value="'+esc(it.title)+'">'+
-      '<input name="item_desc[]" placeholder="Description" value="'+esc(it.desc)+'">'+
-      '<input name="item_qty[]" type="number" min="0" step="1" value="'+(it.qty||1)+'" style="text-align:center">'+
-      '<input name="item_price[]" type="number" min="0" step="0.01" value="'+(it.price||0)+'">'+
-      '<select name="item_billing[]"><option value="one_time"'+(it.billing!=='monthly'?' selected':'')+'>One-time</option><option value="monthly"'+(it.billing==='monthly'?' selected':'')+'>Monthly</option></select>'+
-      '<button type="button" class="x" title="Remove" style="background:transparent;border:none;color:#b02424;cursor:pointer;font-size:1.2rem">×</button>';
+      '<input name="item_qty[]" type="number" min="0" step="1" value="'+(parseFloat(it.qty)||1)+'" style="text-align:center">'+
+      '<input name="item_cost[]" type="number" min="0" step="0.01" placeholder="Our cost" title="What this costs Modern Ops (per unit, never shown to the customer)" value="'+esc(num(it.cost))+'">'+
+      '<input name="item_margin[]" type="number" step="0.1" placeholder="%" title="Margin % added on top of our cost" value="'+esc(num(it.margin))+'">'+
+      '<input name="item_price[]" type="number" min="0" step="0.01" title="Total cost to the customer, per unit. Editing this updates the margin." value="'+(it.price||0)+'">'+
+      '<select name="item_billing[]">'+Object.keys(PERIODS).map(function(k){return '<option value="'+k+'"'+((it.billing||'one_time')===k?' selected':'')+'>'+PERIODS[k][0]+'</option>';}).join('')+'</select>'+
+      '<div class="lt" style="text-align:right;font-weight:600;font-size:.88rem;white-space:nowrap"></div>'+
+      '<button type="button" class="x" title="Remove" style="background:transparent;border:none;color:#b02424;cursor:pointer;font-size:1.2rem">×</button>'+
+      '<input name="item_desc[]" placeholder="Description (shown on the quote)" value="'+esc(it.desc)+'">';
     lines.appendChild(row);
+    var bill = row.querySelector('[name="item_billing[]"]'), price = row.querySelector('[name="item_price[]"]'),
+        cost = row.querySelector('[name="item_cost[]"]'), margin = row.querySelector('[name="item_margin[]"]');
+    // Our cost + margin -> total cost (price).
+    function fromMargin(){
+      var c=parseFloat(cost.value), m=parseFloat(margin.value);
+      if(c>=0 && cost.value!=='' && !isNaN(m)) price.value=r2(c*(1+m/100));
+    }
+    cost.addEventListener('input',fromMargin);
+    margin.addEventListener('input',fromMargin);
+    // Editing the total cost recomputes the margin.
+    price.addEventListener('input',function(){
+      var c=parseFloat(cost.value), p=parseFloat(price.value);
+      if(c>0 && !isNaN(p)) margin.value=(Math.round((p/c-1)*1000)/10).toString();
+    });
+    // Switching between recurring periods rescales the prices ($70/mo -> $210/qtr -> $840/yr).
+    bill.dataset.prev = bill.value;
+    bill.addEventListener('change',function(){
+      var a=months(bill.dataset.prev), b=months(bill.value);
+      if(a && b && a!==b){
+        price.value=r2((parseFloat(price.value)||0)*b/a);
+        if(cost.value!=='') cost.value=r2((parseFloat(cost.value)||0)*b/a);
+      }
+      bill.dataset.prev = bill.value;
+    });
     row.querySelector('.x').addEventListener('click',function(){row.remove();recalc();});
     row.addEventListener('input',recalc);
     row.addEventListener('change',recalc);
   }
   function recalc(){
-    var one=0,mo=0;
+    var one=0,rec={},cst={},rev={};
     lines.querySelectorAll('.line-row').forEach(function(r){
       var q=parseFloat(r.querySelector('[name="item_qty[]"]').value)||0;
       var p=parseFloat(r.querySelector('[name="item_price[]"]').value)||0;
+      var c=parseFloat(r.querySelector('[name="item_cost[]"]').value)||0;
       var b=r.querySelector('[name="item_billing[]"]').value;
-      if(b==='monthly') mo+=q*p; else one+=q*p;
+      r.querySelector('.lt').textContent=money(q*p)+suffix(b);
+      if(months(b)) rec[b]=(rec[b]||0)+q*p; else one+=q*p;
+      cst[b]=(cst[b]||0)+q*c; rev[b]=(rev[b]||0)+q*p;
     });
     var rate=parseFloat(document.getElementById('taxRate').value)||0;
     var tax=one*rate/100;
     document.getElementById('tOne').textContent=money(one);
     document.getElementById('tTax').textContent=money(tax);
     document.getElementById('tOneTotal').textContent=money(one+tax);
-    document.getElementById('tMo').textContent=money(mo)+'/mo';
+    var parts=Object.keys(PERIODS).filter(function(k){return k in rec;}).map(function(k){return money(rec[k])+suffix(k);});
+    document.getElementById('tMo').innerHTML=parts.length?parts.join('<br>'):'$0.00/mo';
+    // Internal: our cost and profit per billing period.
+    var keys=Object.keys(PERIODS).filter(function(k){return k in rev;});
+    document.getElementById('tCost').innerHTML=keys.length?keys.map(function(k){return money(cst[k])+suffix(k);}).join('<br>'):'$0.00';
+    document.getElementById('tProfit').innerHTML=keys.length?keys.map(function(k){
+      var pr=rev[k]-cst[k]; return money(pr)+suffix(k)+(cst[k]>0?' <span style="font-size:.75rem;opacity:.75">('+Math.round(pr/cst[k]*100)+'%)</span>':'');
+    }).join('<br>'):'$0.00';
   }
-  document.getElementById('addCat').addEventListener('click',function(){if(CATALOG.length){var c=CATALOG[cp.value||0];addLine({title:c.title,desc:c.description,qty:1,price:c.unit_price,billing:c.billing});recalc();}});
-  document.getElementById('addCustom').addEventListener('click',function(){addLine();});
+  document.getElementById('addCat').addEventListener('click',function(){if(CATALOG.length){var c=CATALOG[cp.value||0];addLine({title:c.title,desc:c.description,qty:1,price:c.unit_price,cost:'',margin:DEFAULT_MARGIN,billing:c.billing});recalc();}});
+  document.getElementById('addCustom').addEventListener('click',function(){addLine();recalc();});
   document.getElementById('taxRate').addEventListener('input',recalc);
 
   if(INITIAL.length){INITIAL.forEach(addLine);} else {addLine();}

@@ -2,6 +2,7 @@
 /** View a quote rendered in the Modern Ops template style, with actions. */
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
+require_once __DIR__ . '/_billing.php';
 require_login();
 
 $id = (int)($_GET['id'] ?? 0);
@@ -37,8 +38,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $it = db()->prepare('SELECT * FROM quote_items WHERE quote_id=? ORDER BY sort_order, id');
 $it->execute([$id]);
 $items = $it->fetchAll();
-$one = array_filter($items, fn($i) => $i['billing'] !== 'monthly');
-$mo  = array_filter($items, fn($i) => $i['billing'] === 'monthly');
+$one = array_filter($items, fn($i) => billing_clean($i['billing']) === 'one_time');
+$mo  = array_filter($items, fn($i) => billing_clean($i['billing']) !== 'one_time');
+$recTotals = billing_recurring_totals($items);
+$recBand = billing_band($recTotals);
 $sum = function($rows) { $t = 0; foreach ($rows as $r) $t += (float)$r['quantity'] * (float)$r['unit_price']; return $t; };
 $oneSub = $sum($one); $moSub = $sum($mo);
 $taxRate = (float)$q['tax_rate'];
@@ -87,6 +90,23 @@ layout_header('Quote ' . $q['quote_number'], 'quotes.php');
   </form>
 </div>
 
+<?php
+// Internal profit summary (only for lines where our cost was entered); never on the customer copy.
+$costed = array_filter($items, fn($i) => $i['unit_cost'] !== null);
+if ($costed):
+    $byP = [];
+    foreach ($costed as $r) { $k = billing_clean($r['billing']); $byP[$k][0] = ($byP[$k][0] ?? 0) + (float)$r['quantity'] * (float)$r['unit_cost']; $byP[$k][1] = ($byP[$k][1] ?? 0) + (float)$r['quantity'] * (float)$r['unit_price']; }
+    uksort($byP, fn($a, $b) => array_search($a, array_keys(billing_periods())) <=> array_search($b, array_keys(billing_periods())));
+?>
+<div class="card" style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:center;font-size:.88rem">
+  <span class="muted" style="font-size:.78rem">Internal only (not on the customer copy):</span>
+  <?php foreach ($byP as $k => [$c, $p]): ?>
+    <span><strong><?= e(billing_label($k)) ?>:</strong> our cost <?= money($c) . e(billing_suffix($k)) ?> · profit <strong><?= money($p - $c) . e(billing_suffix($k)) ?></strong><?= $c > 0 ? ' (' . round(($p - $c) / $c * 100) . '%)' : '' ?></span>
+  <?php endforeach; ?>
+  <?php if (count($costed) < count($items)): ?><span class="muted" style="font-size:.78rem"><?= count($items) - count($costed) ?> line(s) have no cost entered.</span><?php endif; ?>
+</div>
+<?php endif; ?>
+
 <!-- Paper preview (mirrors the PDF) -->
 <div class="card" style="background:#fff;color:#1a1a1a;max-width:780px;margin:0 auto;padding:2.2rem 2.4rem;font-family:Arial,Helvetica,sans-serif">
   <div style="font-weight:800;letter-spacing:.14em;color:#0F3D2A;font-size:1.3rem">MODERN OPS</div>
@@ -114,10 +134,10 @@ layout_header('Quote ' . $q['quote_number'], 'quotes.php');
   <?php endif; ?>
 
   <?php if ($mo): ?>
-    <div style="background:#E6F4EC;color:#0F3D2A;font-weight:700;font-size:.72rem;letter-spacing:.05em;padding:.4rem .6rem;margin-top:1rem">MONTHLY RECURRING (OPTIONAL)</div>
+    <div style="background:#E6F4EC;color:#0F3D2A;font-weight:700;font-size:.72rem;letter-spacing:.05em;padding:.4rem .6rem;margin-top:1rem"><?= e($recBand) ?></div>
     <table style="width:100%;border-collapse:collapse">
       <?php foreach ($mo as $r): $lt=(float)$r['quantity']*(float)$r['unit_price']; ?>
-        <tr><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd"><div style="font-weight:700"><?= e($r['title']) ?></div><div style="color:#555;font-size:.76rem"><?= e($r['description']) ?></div></td><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd;text-align:right;font-weight:700;white-space:nowrap"><?= money($lt) ?>/mo</td></tr>
+        <tr><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd"><div style="font-weight:700"><?= e($r['title']) ?></div><div style="color:#555;font-size:.76rem"><?= e($r['description']) ?></div></td><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd;text-align:right;font-weight:700;white-space:nowrap"><?= money($lt) ?><?= e(billing_suffix($r['billing'])) ?></td></tr>
       <?php endforeach; ?>
     </table>
   <?php endif; ?>
@@ -128,9 +148,9 @@ layout_header('Quote ' . $q['quote_number'], 'quotes.php');
   <?php if ($taxRate > 0): ?><tr><td style="text-align:right;padding:.2rem .6rem;color:#555"><?= e($q['tax_label']) ?> (<?= rtrim(rtrim(number_format($taxRate,3),'0'),'.') ?>%)</td><td style="text-align:right;padding:.2rem .6rem"><?= money($tax) ?></td></tr><?php endif; ?>
   </table>
 
-  <div style="display:flex;justify-content:flex-end;gap:0;margin-top:.8rem">
+  <div style="display:flex;justify-content:flex-end;gap:0;margin-top:.8rem;flex-wrap:wrap">
     <?php if ($one || $taxRate>0): ?><div style="background:#E6F4EC;color:#0F3D2A;padding:.7rem 1.1rem;font-weight:700;font-size:.8rem;text-align:center;min-width:150px">ONE-TIME TOTAL<br><?= money($oneTotal) ?></div><?php endif; ?>
-    <?php if ($mo): ?><div style="background:#0F3D2A;color:#fff;padding:.7rem 1.1rem;font-weight:700;font-size:.8rem;text-align:center;min-width:150px">MONTHLY TOTAL<br><?= money($moSub) ?>/mo</div><?php endif; ?>
+    <?php foreach ($recTotals as $bk => $bt): ?><div style="background:#0F3D2A;color:#fff;padding:.7rem 1.1rem;font-weight:700;font-size:.8rem;text-align:center;min-width:150px;border-left:1px solid #2a5a45"><?= e(billing_periods()[$bk][3]) ?><br><?= money($bt) . e(billing_suffix($bk)) ?></div><?php endforeach; ?>
   </div>
 
   <?php if (trim((string)$q['notes']) !== ''): ?>

@@ -1,6 +1,7 @@
 <?php
 /** Build a Modern Ops quote PDF (FPDF) that mirrors the .docx template. */
 require_once __DIR__ . '/_db.php';
+require_once __DIR__ . '/_billing.php';
 require_once __DIR__ . '/../../lib/fpdf.php';
 
 /** UTF-8 -> cp1252 for FPDF core fonts. */
@@ -13,7 +14,7 @@ function tx($s): string {
 function quote_terms(): array {
     return [
         ['Client Approval & Acceptance', 'The Client is responsible for reviewing all deliverables and communicating any concerns in writing prior to final approval. Once the Client approves a deliverable in writing (including via email), that item is considered complete and accepted as-is. Modern Ops shall not be held liable for any dissatisfaction arising from approved work. Requests to redo approved work will be treated as new work and billed accordingly.'],
-        ['Payment Terms', 'All one-time fees are due upon acceptance of the quote unless otherwise agreed in writing. Monthly recurring fees are due on the 1st of each month. Invoices not paid within 15 days of the due date may result in suspension of services. All fees paid are non-refundable once work has commenced. Modern Ops accepts payment via check, bank transfer, or any agreed-upon payment platform.'],
+        ['Payment Terms', 'All one-time fees are due upon acceptance of the quote unless otherwise agreed in writing. Recurring fees are due on the 1st of each billing period (monthly, quarterly, semi-annually or annually, as listed on the quote). Invoices not paid within 15 days of the due date may result in suspension of services. All fees paid are non-refundable once work has commenced. Modern Ops accepts payment via check, bank transfer, or any agreed-upon payment platform.'],
         ['Website Ownership & Intellectual Property', 'Upon receipt of full payment, the Client owns the website content and design created specifically for them. Third-party tools, themes, plugins, and software remain subject to their respective licenses. The Client represents that they own or have rights to all content they provide. Modern Ops is not liable for any intellectual property claims arising from Client-provided content. Modern Ops retains the right to display completed work in its portfolio unless the Client requests otherwise in writing.'],
         ['Hosting, Domain & Third-Party Services', 'Hosting and domain fees are billed annually and are non-refundable once paid. Modern Ops is not liable for outages, data loss, or service interruptions caused by third-party hosting providers, domain registrars, or any other external services. The Client is responsible for maintaining their domain registration. Modern Ops does not guarantee uninterrupted availability of any website.'],
         ['Monthly Maintenance & Support', 'Monthly maintenance covers only the tasks explicitly described in the quote. Modern Ops is not liable for security breaches, data loss, or site issues caused by third-party plugins, external attacks, or Client actions. Monthly services may be cancelled with 30 days written notice. No refunds are issued for partial months.'],
@@ -44,8 +45,9 @@ function build_quote_pdf(int $id): ?string {
 }
 
 function render_quote_pdf(array $q, array $items): string {
-    $one = array_values(array_filter($items, fn($i) => $i['billing'] !== 'monthly'));
-    $mo  = array_values(array_filter($items, fn($i) => $i['billing'] === 'monthly'));
+    $one = array_values(array_filter($items, fn($i) => billing_clean($i['billing']) === 'one_time'));
+    $mo  = array_values(array_filter($items, fn($i) => billing_clean($i['billing']) !== 'one_time'));
+    $recTotals = billing_recurring_totals($items);
     $sum = function ($rows) { $t = 0; foreach ($rows as $r) $t += (float)$r['quantity'] * (float)$r['unit_price']; return $t; };
     $oneSub = $sum($one); $moSub = $sum($mo);
     $rate = (float)$q['tax_rate']; $tax = $oneSub * $rate / 100; $oneTotal = $oneSub + $tax;
@@ -93,13 +95,13 @@ function render_quote_pdf(array $q, array $items): string {
         $pdf->MultiCell(0, 4.6, tx($q['scope_of_work']), 0, 'L');
         $pdf->Ln(3);
     }
-    $renderRows = function ($rows, $suffix) use ($pdf, $descW, $priceW, $LINE, $GREY, $m) {
+    $renderRows = function ($rows) use ($pdf, $descW, $priceW, $LINE, $GREY, $m) {
         foreach ($rows as $r) {
             $lt = (float)$r['quantity'] * (float)$r['unit_price'];
             $title = $r['title']; if ((float)$r['quantity'] > 1) $title .= ' x' . rtrim(rtrim(number_format((float)$r['quantity'], 2), '0'), '.');
             $pdf->SetFont('Arial', 'B', 10); $pdf->SetTextColor(26, 26, 26);
             $pdf->Cell($descW, 5, tx($title), 0, 0, 'L');
-            $pdf->Cell($priceW, 5, tx($m($lt) . $suffix), 0, 1, 'R');
+            $pdf->Cell($priceW, 5, tx($m($lt) . billing_suffix($r['billing'])), 0, 1, 'R');
             if (trim((string)$r['description']) !== '') {
                 $pdf->SetFont('Arial', '', 8); $pdf->SetTextColor(...$GREY);
                 $pdf->MultiCell($descW, 4, tx($r['description']), 0, 'L');
@@ -109,8 +111,8 @@ function render_quote_pdf(array $q, array $items): string {
         }
     };
 
-    if ($one) { $band('ONE-TIME SERVICES'); $renderRows($one, ''); }
-    if ($mo)  { $pdf->Ln(2); $band('MONTHLY RECURRING (OPTIONAL)'); $renderRows($mo, '/mo'); }
+    if ($one) { $band('ONE-TIME SERVICES'); $renderRows($one); }
+    if ($mo)  { $pdf->Ln(2); $band(billing_band($recTotals)); $renderRows($mo); }
 
     // Subtotal / tax
     $pdf->Ln(2);
@@ -125,7 +127,8 @@ function render_quote_pdf(array $q, array $items): string {
     $pdf->Ln(2);
 
     // Total boxes
-    $boxW = 52; $boxH = 12; $startX = $pageW - $R - $boxW * (($one || $rate > 0 ? 1 : 0) + ($mo ? 1 : 0));
+    $nBox = max(1, ($one || $rate > 0 ? 1 : 0) + count($recTotals));
+    $boxW = min(52, $contentW / $nBox); $boxH = 12; $startX = $pageW - $R - $boxW * $nBox;
     $yBox = $pdf->GetY(); $x = $startX;
     $drawBox = function ($x, $y, $title, $val, $bg, $fg) use ($pdf, $boxW, $boxH) {
         $pdf->SetXY($x, $y); $pdf->SetFillColor(...$bg); $pdf->SetTextColor(...$fg);
@@ -133,7 +136,7 @@ function render_quote_pdf(array $q, array $items): string {
         $pdf->MultiCell($boxW, $boxH / 2, tx($title) . "\n" . tx($val), 0, 'C', true);
     };
     if ($one || $rate > 0) { $drawBox($x, $yBox, 'ONE-TIME TOTAL', $m($oneTotal), [230,244,236], [15,61,42]); $x += $boxW; }
-    if ($mo) { $drawBox($x, $yBox, 'MONTHLY TOTAL', $m($moSub) . '/mo', [15,61,42], [255,255,255]); }
+    foreach ($recTotals as $bk => $bt) { $drawBox($x, $yBox, billing_periods()[$bk][3], $m($bt) . billing_suffix($bk), [15,61,42], [255,255,255]); $x += $boxW; }
     $pdf->SetXY($L, $yBox + $boxH + 4);
 
     // Notes

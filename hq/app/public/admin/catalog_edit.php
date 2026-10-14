@@ -2,6 +2,7 @@
 /** Edit a saved catalog item. */
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
+require_once __DIR__ . '/_billing.php';
 require_login();
 
 $id = (int)($_GET['id'] ?? 0);
@@ -17,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         trim($_POST['title'] ?? ''),
         trim($_POST['description'] ?? ''),
         (float)($_POST['unit_price'] ?? 0),
-        ($_POST['billing'] ?? 'one_time') === 'monthly' ? 'monthly' : 'one_time',
+        billing_clean($_POST['billing'] ?? 'one_time'),
         $id,
     ]);
     header('Location: catalog.php'); exit;
@@ -37,7 +38,7 @@ layout_header('Edit item', 'catalog.php');
     <input type="text" name="description" value="<?= e($c['description']) ?>">
     <div class="grid2">
       <div><label>Unit price ($)</label><input type="number" step="0.01" min="0" name="unit_price" value="<?= e($c['unit_price']) ?>"></div>
-      <div><label>Billing</label><select name="billing"><option value="one_time"<?= $c['billing']==='one_time'?' selected':'' ?>>One-time</option><option value="monthly"<?= $c['billing']==='monthly'?' selected':'' ?>>Monthly</option></select></div>
+      <div><label>Billing</label><select name="billing"><?= billing_options((string)$c['billing']) ?></select></div>
     </div>
     <div class="row-actions" style="margin-top:1.25rem">
       <button class="btn" type="submit">Save changes</button>
