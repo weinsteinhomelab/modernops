@@ -2,7 +2,7 @@
 /** Idempotent schema migrations so a live database upgrades itself safely. */
 require_once __DIR__ . '/_db.php';
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 /** The standard Modern Ops service catalog (from the quote template). */
 function catalog_defaults(): array {
@@ -117,12 +117,30 @@ function run_phase3_migration(): void {
     } catch (Exception $ex) {}
 }
 
+/** Phase 4: demo + live websites tied to a business. */
+function run_phase4_migration(): void {
+    try {
+        db()->exec("CREATE TABLE IF NOT EXISTS sites (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            business_id INT NOT NULL,
+            kind ENUM('demo','live') NOT NULL DEFAULT 'demo',
+            label VARCHAR(190) DEFAULT NULL,
+            url VARCHAR(500) NOT NULL,
+            notes TEXT DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX (business_id)
+         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (Exception $ex) {}
+}
+
 function maybe_migrate(): void {
     try {
         $v = (int) (setting('schema_version', '1'));
         if ($v >= SCHEMA_VERSION) return;
         if ($v < 2) run_phase2_migration();
         if ($v < 3) run_phase3_migration();
+        if ($v < 4) run_phase4_migration();
         set_setting('schema_version', (string) SCHEMA_VERSION);
     } catch (Exception $ex) {}
 }
