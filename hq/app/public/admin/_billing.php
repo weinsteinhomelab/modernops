@@ -32,7 +32,7 @@ function billing_recurring_totals(array $items): array {
     foreach (array_keys(billing_periods()) as $k) {
         if ($k === 'one_time') continue;
         $t = 0; $any = false;
-        foreach ($items as $r) if (billing_clean($r['billing']) === $k) { $t += (float)$r['quantity'] * (float)$r['unit_price']; $any = true; }
+        foreach ($items as $r) if (empty($r['is_section']) && billing_clean($r['billing']) === $k) { $t += (float)$r['quantity'] * (float)$r['unit_price']; $any = true; }
         if ($any) $out[$k] = $t;
     }
     return $out;
@@ -40,6 +40,6 @@ function billing_recurring_totals(array $items): array {
 
 /** Heading for the recurring section of a quote. */
 function billing_band(array $recTotals): string {
-    if (count($recTotals) !== 1) return 'RECURRING SERVICES (OPTIONAL)';
-    return str_replace(' TOTAL', '', billing_periods()[array_key_first($recTotals)][3]) . ' RECURRING (OPTIONAL)';
+    if (count($recTotals) !== 1) return 'RECURRING SERVICES';
+    return str_replace(' TOTAL', '', billing_periods()[array_key_first($recTotals)][3]) . ' RECURRING';
 }

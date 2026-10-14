@@ -97,6 +97,13 @@ function render_quote_pdf(array $q, array $items): string {
     }
     $renderRows = function ($rows) use ($pdf, $descW, $priceW, $LINE, $GREY, $m) {
         foreach ($rows as $r) {
+            if (!empty($r['is_section'])) {
+                $pdf->Ln(1); $pdf->SetFont('Arial', 'B', 9.5); $pdf->SetTextColor(15, 61, 42);
+                $pdf->Cell($descW + $priceW, 5.5, tx($r['title']), 0, 1, 'L');
+                $pdf->SetDrawColor(15, 61, 42); $pdf->SetLineWidth(0.4);
+                $pdf->Line($pdf->GetX(), $pdf->GetY(), $pdf->GetX() + $descW + $priceW, $pdf->GetY()); $pdf->Ln(2);
+                continue;
+            }
             $lt = (float)$r['quantity'] * (float)$r['unit_price'];
             $title = $r['title']; if ((float)$r['quantity'] > 1) $title .= ' x' . rtrim(rtrim(number_format((float)$r['quantity'], 2), '0'), '.');
             $pdf->SetFont('Arial', 'B', 10); $pdf->SetTextColor(26, 26, 26);

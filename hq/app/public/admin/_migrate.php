@@ -2,7 +2,7 @@
 /** Idempotent schema migrations so a live database upgrades itself safely. */
 require_once __DIR__ . '/_db.php';
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 /** The standard Modern Ops service catalog (from the quote template). */
 function catalog_defaults(): array {
@@ -146,6 +146,11 @@ function run_phase5_migration(): void {
     }
 }
 
+/** Phase 6: section headings among quote lines (title only; billing marks the one-time or recurring area). */
+function run_phase6_migration(): void {
+    try { db()->exec("ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS is_section TINYINT NOT NULL DEFAULT 0 AFTER billing"); } catch (Exception $ex) {}
+}
+
 function maybe_migrate(): void {
     try {
         $v = (int) (setting('schema_version', '1'));
@@ -154,6 +159,7 @@ function maybe_migrate(): void {
         if ($v < 3) run_phase3_migration();
         if ($v < 4) run_phase4_migration();
         if ($v < 5) run_phase5_migration();
+        if ($v < 6) run_phase6_migration();
         set_setting('schema_version', (string) SCHEMA_VERSION);
     } catch (Exception $ex) {}
 }

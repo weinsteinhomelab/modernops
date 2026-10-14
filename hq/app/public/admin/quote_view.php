@@ -92,7 +92,8 @@ layout_header('Quote ' . $q['quote_number'], 'quotes.php');
 
 <?php
 // Internal profit summary (only for lines where our cost was entered); never on the customer copy.
-$costed = array_filter($items, fn($i) => $i['unit_cost'] !== null);
+$costed = array_filter($items, fn($i) => $i['unit_cost'] !== null && empty($i['is_section']));
+$lineCount = count(array_filter($items, fn($i) => empty($i['is_section'])));
 if ($costed):
     $byP = [];
     foreach ($costed as $r) { $k = billing_clean($r['billing']); $byP[$k][0] = ($byP[$k][0] ?? 0) + (float)$r['quantity'] * (float)$r['unit_cost']; $byP[$k][1] = ($byP[$k][1] ?? 0) + (float)$r['quantity'] * (float)$r['unit_price']; }
@@ -103,7 +104,7 @@ if ($costed):
   <?php foreach ($byP as $k => [$c, $p]): ?>
     <span><strong><?= e(billing_label($k)) ?>:</strong> our cost <?= money($c) . e(billing_suffix($k)) ?> · profit <strong><?= money($p - $c) . e(billing_suffix($k)) ?></strong><?= $c > 0 ? ' (' . round(($p - $c) / $c * 100) . '%)' : '' ?></span>
   <?php endforeach; ?>
-  <?php if (count($costed) < count($items)): ?><span class="muted" style="font-size:.78rem"><?= count($items) - count($costed) ?> line(s) have no cost entered.</span><?php endif; ?>
+  <?php if (count($costed) < $lineCount): ?><span class="muted" style="font-size:.78rem"><?= $lineCount - count($costed) ?> line(s) have no cost entered.</span><?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -128,6 +129,7 @@ if ($costed):
     <div style="background:#E6F4EC;color:#0F3D2A;font-weight:700;font-size:.72rem;letter-spacing:.05em;padding:.4rem .6rem;margin-top:.8rem">ONE-TIME SERVICES</div>
     <table style="width:100%;border-collapse:collapse">
       <?php foreach ($one as $r): $lt=(float)$r['quantity']*(float)$r['unit_price']; ?>
+        <?php if (!empty($r['is_section'])): ?><tr><td colspan="2" style="padding:.8rem .6rem .3rem;font-weight:700;color:#0F3D2A;font-size:.82rem;border-bottom:1.5px solid #0F3D2A"><?= e($r['title']) ?></td></tr><?php continue; endif; ?>
         <tr><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd"><div style="font-weight:700"><?= e($r['title']) ?><?= (float)$r['quantity']>1 ? ' ×'.rtrim(rtrim(number_format((float)$r['quantity'],2),'0'),'.') : '' ?></div><div style="color:#555;font-size:.76rem"><?= e($r['description']) ?></div></td><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd;text-align:right;font-weight:700;white-space:nowrap"><?= money($lt) ?></td></tr>
       <?php endforeach; ?>
     </table>
@@ -137,6 +139,7 @@ if ($costed):
     <div style="background:#E6F4EC;color:#0F3D2A;font-weight:700;font-size:.72rem;letter-spacing:.05em;padding:.4rem .6rem;margin-top:1rem"><?= e($recBand) ?></div>
     <table style="width:100%;border-collapse:collapse">
       <?php foreach ($mo as $r): $lt=(float)$r['quantity']*(float)$r['unit_price']; ?>
+        <?php if (!empty($r['is_section'])): ?><tr><td colspan="2" style="padding:.8rem .6rem .3rem;font-weight:700;color:#0F3D2A;font-size:.82rem;border-bottom:1.5px solid #0F3D2A"><?= e($r['title']) ?></td></tr><?php continue; endif; ?>
         <tr><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd"><div style="font-weight:700"><?= e($r['title']) ?></div><div style="color:#555;font-size:.76rem"><?= e($r['description']) ?></div></td><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd;text-align:right;font-weight:700;white-space:nowrap"><?= money($lt) ?><?= e(billing_suffix($r['billing'])) ?></td></tr>
       <?php endforeach; ?>
     </table>

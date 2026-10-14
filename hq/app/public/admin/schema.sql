@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS quote_items (
   unit_cost   DECIMAL(10,2) DEFAULT NULL,
   margin      DECIMAL(8,2) DEFAULT NULL,
   billing     ENUM('one_time','monthly','quarterly','semiannual','annual') NOT NULL DEFAULT 'one_time',
+  is_section  TINYINT NOT NULL DEFAULT 0,
   sort_order  INT NOT NULL DEFAULT 0,
   INDEX (quote_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
