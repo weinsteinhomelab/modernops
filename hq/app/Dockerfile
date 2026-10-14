@@ -3,8 +3,8 @@ FROM php:8.2-apache
 # PDO MySQL + mbstring (needed by the IMAP library)
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends unzip libonig-dev; \
-    docker-php-ext-install pdo_mysql mbstring; \
+    apt-get install -y --no-install-recommends unzip libonig-dev libzip-dev; \
+    docker-php-ext-install pdo_mysql mbstring zip; \
     rm -rf /var/lib/apt/lists/*
 
 # Serve from /public and allow .htaccess

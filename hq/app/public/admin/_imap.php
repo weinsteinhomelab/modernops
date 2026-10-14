@@ -15,7 +15,8 @@ function imap_accounts(): array {
 
 /** @return \Webklex\PHPIMAP\Client */
 function imap_client(string $account) {
-    $cm = new \Webklex\PHPIMAP\ClientManager();
+    // No ext-imap in this image, so decode subjects with iconv instead of imap_utf8()
+    $cm = new \Webklex\PHPIMAP\ClientManager(['options' => ['decoder' => ['message' => 'iconv', 'attachment' => 'iconv']]]);
     $client = $cm->make([
         'host'          => IMAP_HOST,
         'port'          => IMAP_PORT,
@@ -33,11 +34,11 @@ function imap_client(string $account) {
 function imap_list(string $account, int $limit = 25): array {
     $client = imap_client($account);
     $folder = $client->getFolder('INBOX');
-    $messages = $folder->query()->limit($limit)->setFetchOrder('desc')->setFetchBody(false)->leaveUnread()->get();
+    $messages = $folder->query()->all()->limit($limit)->setFetchOrder('desc')->setFetchBody(false)->leaveUnread()->get();
     $out = [];
     foreach ($messages as $m) {
         $from = $m->getFrom();
-        $f = ($from && count($from)) ? $from[0] : null;
+        $f = ($from && $from->count()) ? $from->first() : null;
         $seen = false;
         foreach ($m->getFlags() as $flag) { if (stripos((string)$flag, 'seen') !== false) { $seen = true; break; } }
         $out[] = [
@@ -45,11 +46,12 @@ function imap_list(string $account, int $limit = 25): array {
             'from_name' => $f ? ((string)($f->personal ?: $f->mail)) : '(unknown)',
             'from_mail' => $f ? (string)$f->mail : '',
             'subject'   => (string)$m->getSubject(),
-            'date'      => $m->getDate() ? $m->getDate()->toDateTimeString() : '',
+            'date'      => $m->getDate()->count() ? $m->getDate()->toDate()->toDateTimeString() : '',
             'seen'      => $seen,
         ];
     }
     $client->disconnect();
+    usort($out, fn($a, $b) => $b['uid'] <=> $a['uid']); // newest first
     return $out;
 }
 
@@ -61,9 +63,9 @@ function imap_open(string $account, int $uid): ?array {
     if (!$m) { $client->disconnect(); return null; }
 
     $from = $m->getFrom();
-    $f = ($from && count($from)) ? $from[0] : null;
+    $f = ($from && $from->count()) ? $from->first() : null;
     $toStr = '';
-    try { foreach ($m->getTo() as $a) { $toStr .= ($toStr ? ', ' : '') . ((string)($a->mail ?? '')); } } catch (\Throwable $e) {}
+    try { foreach ($m->getTo()->toArray() as $a) { $toStr .= ($toStr ? ', ' : '') . ((string)($a->mail ?? '')); } } catch (\Throwable $e) {}
 
     $text = (string)$m->getTextBody();
     if (trim($text) === '') {
@@ -82,7 +84,7 @@ function imap_open(string $account, int $uid): ?array {
         'from_mail'  => $f ? (string)$f->mail : '',
         'to'         => $toStr,
         'subject'    => (string)$m->getSubject(),
-        'date'       => $m->getDate() ? $m->getDate()->toDateTimeString() : '',
+        'date'       => $m->getDate()->count() ? $m->getDate()->toDate()->toDateTimeString() : '',
         'body'       => $text,
         'attachments'=> $atts,
     ];
