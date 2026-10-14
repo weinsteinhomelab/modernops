@@ -1,0 +1,69 @@
+services:
+  app:
+    build: ./app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8090}:80"
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      NOTIFY_EMAIL: ${NOTIFY_EMAIL}
+      SITE_ORIGIN: ${SITE_ORIGIN}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SECURE: ${SMTP_SECURE}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      MAIL_FROM: ${MAIL_FROM}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME}
+      APP_SECRET: ${APP_SECRET}
+    depends_on:
+      - db
+
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASS}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}
+    volumes:
+      - db_data:/var/lib/mysql
+
+  # Nightly database backup -> ./backup (keeps ~14 days)
+  backup:
+    image: mariadb:11
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DB_ROOT_PASS: ${DB_ROOT_PASS}
+      DB_NAME: ${DB_NAME}
+    volumes:
+      - ./backup:/backup
+    entrypoint: ["/bin/sh","-c"]
+    command: >
+      'while true; do
+         sleep 86400;
+         mysqldump -h db -u root -p"$$DB_ROOT_PASS" "$$DB_NAME" > "/backup/hq-$$(date +%F).sql" 2>/backup/last-error.log || true;
+         ls -1t /backup/hq-*.sql 2>/dev/null | tail -n +15 | xargs -r rm -f;
+       done'
+
+  # ---- Optional: Cloudflare Tunnel ----
+  # Easiest path: create a tunnel in the Cloudflare dashboard (Zero Trust ->
+  # Networks -> Tunnels), copy its token, put it in .env as TUNNEL_TOKEN, then
+  # uncomment this service. Point the tunnel's public hostname (e.g.
+  # hq.modern-ops.net) at  http://app:80.
+  #
+  # cloudflared:
+  #   image: cloudflare/cloudflared:latest
+  #   restart: unless-stopped
+  #   command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+  #   depends_on:
+  #     - app
+
+volumes:
+  db_data:
