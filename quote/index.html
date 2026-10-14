@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Your quote | Modern Ops</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231a6b4a'/%3E%3Ctext%20x='16'%20y='21.5'%20font-family='Georgia,serif'%20font-size='16'%20font-weight='700'%20text-anchor='middle'%3E%3Ctspan%20fill='%231a1a1a'%3EM%3C/tspan%3E%3Ctspan%20fill='%23ffffff'%3EO%3C/tspan%3E%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --black: #1a1a1a; --white: #fafaf8; --accent: #1a6b4a; --accent-light: #e8f4ee; --mid: #555; --border: #ddd; --danger: #b02424; }
+  body { font-family: 'Lato', sans-serif; background: #f0ede5; color: var(--black); line-height: 1.6; }
+  nav { display: flex; justify-content: space-between; align-items: center; padding: 1rem 6%; background: var(--white); border-bottom: 1px solid var(--border); }
+  nav a.contact { color: var(--mid); text-decoration: none; font-size: .9rem; }
+  nav a.contact:hover { color: var(--accent); }
+  main { max-width: 900px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 2.25rem 2.5rem; box-shadow: 0 6px 30px rgba(0,0,0,.05); }
+  .msg { text-align: center; padding: 3rem 1.5rem; color: var(--mid); }
+  .msg h1 { font-family: 'Playfair Display', serif; color: var(--black); font-size: 1.6rem; margin-bottom: .5rem; }
+  .accept { margin-top: 1.5rem; }
+  .accept h2 { font-family: 'Playfair Display', serif; font-size: 1.5rem; margin-bottom: .35rem; }
+  .accept .sub { color: var(--mid); margin-bottom: 1.25rem; }
+  .group { margin-bottom: 1.25rem; }
+  .group-label { font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: .5rem; }
+  .check { display: flex; gap: .7rem; align-items: flex-start; padding: .75rem .9rem; border: 1px solid var(--border); border-radius: 9px; margin-bottom: .5rem; cursor: pointer; }
+  .check:hover { border-color: var(--accent); }
+  .check input { margin-top: .3rem; width: 1.05rem; height: 1.05rem; accent-color: var(--accent); flex: none; }
+  .check .t { flex: 1; }
+  .check .p { font-weight: 700; white-space: nowrap; }
+  details { border: 1px solid var(--border); border-radius: 9px; padding: .75rem .9rem; margin-bottom: .6rem; }
+  summary { cursor: pointer; font-weight: 700; color: var(--accent); }
+  .terms { margin-top: .75rem; max-height: 320px; overflow: auto; font-size: .85rem; color: #444; padding-right: .5rem; }
+  .terms h4 { font-size: .88rem; color: var(--black); margin: .7rem 0 .15rem; }
+  label.name { display: block; font-size: .85rem; font-weight: 700; margin-bottom: .35rem; }
+  input[type=text] { width: 100%; padding: .85rem 1rem; border: 1.5px solid var(--border); border-radius: 9px; font-family: inherit; font-size: 1.05rem; outline: none; }
+  input[type=text]:focus { border-color: var(--accent); }
+  .sig-preview { font-family: 'Playfair Display', serif; font-style: italic; font-size: 1.5rem; min-height: 2.2rem; color: var(--accent); margin-top: .4rem; }
+  button.go { width: 100%; margin-top: 1rem; background: var(--accent); color: #fff; border: none; border-radius: 9px; padding: 1rem; font-family: inherit; font-weight: 700; font-size: 1rem; cursor: pointer; }
+  button.go:hover { opacity: .9; }
+  button.go:disabled { opacity: .55; cursor: default; }
+  .fine { font-size: .8rem; color: var(--mid); margin-top: .75rem; text-align: center; }
+  .err { background: #fde2e2; color: var(--danger); border-radius: 8px; padding: .7rem .9rem; margin-top: .8rem; font-size: .9rem; display: none; }
+  .done { text-align: center; padding: 1rem 0 .5rem; }
+  .done .tick { width: 64px; height: 64px; border-radius: 50%; background: var(--accent-light); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
+  .done .tick svg { width: 32px; height: 32px; stroke: var(--accent); fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .done h2 { font-family: 'Playfair Display', serif; font-size: 1.6rem; margin-bottom: .4rem; }
+  .done p { color: var(--mid); }
+  footer { text-align: center; padding: 2rem 1rem; font-size: .8rem; color: #999; }
+  @media (max-width: 640px) { .card { padding: 1.4rem 1.1rem; border-radius: 10px; } main { padding: 1rem .6rem 3rem; } }
+  @media print { nav, .accept, footer { display: none; } body { background: #fff; } .card { border: none; box-shadow: none; padding: 0; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/"><img src="/modernops_logo.svg" alt="Modern Ops" style="height: 44px; width: auto; display: block;"></a>
+  <a class="contact" href="mailto:info@modern-ops.net">Questions? info@modern-ops.net</a>
+</nav>
+
+<main>
+  <div id="loading" class="card msg">Loading your quote…</div>
+  <noscript><div class="card msg"><h1>Please turn on JavaScript</h1>This page needs JavaScript to show your quote. You can also reply to the quote email and we'll help.</div></noscript>
+
+  <div id="quote" style="display:none">
+    <div class="card" id="paper"></div>
+    <div class="card accept" id="accept"></div>
+  </div>
+</main>
+
+<footer>© 2026 Modern Ops · modern-ops.net</footer>
+
+<script>
+(function () {
+  // Quotes live in Modern Ops HQ; this page only shows one and records acceptance.
+  var API = "https://hq.kobylab.dev/api/quote.php";
+  var CONTACT = "info@modern-ops.net";
+  var token = (new URLSearchParams(location.search).get("t") || "").trim();
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+
+  function fail(title, text) {
+    $("quote").style.display = "none";
+    $("loading").style.display = "block";
+    $("loading").innerHTML = "<h1>" + esc(title) + "</h1>" + esc(text) +
+      '<br><br><a href="mailto:' + CONTACT + '" style="color:#1a6b4a;font-weight:700">' + CONTACT + "</a>";
+  }
+
+  function done(acc) {
+    $("accept").innerHTML =
+      '<div class="done"><div class="tick"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>' +
+      "<h2>Quote accepted</h2><p>Accepted by <strong>" + esc(acc.name) + "</strong> on " + esc(acc.at) + ".</p>" +
+      "<p style=\"margin-top:.5rem\">Thank you. We've been notified and will be in touch about next steps. You can print or save this page for your records.</p></div>";
+  }
+
+  function form(q) {
+    var h = '<h2>Ready to go ahead?</h2><p class="sub">Review the quote above, then sign below to accept it.</p>';
+    if (q.optional.length) {
+      h += '<div class="group"><div class="group-label">Optional add-ons</div><p class="sub" style="margin-bottom:.6rem">Tick any you would like to add. We will update your quote to include them.</p>';
+      q.optional.forEach(function (o) {
+        h += '<label class="check"><input type="checkbox" name="opt" value="' + o.id + '"><span class="t">' + esc(o.title) + '</span><span class="p">' + esc(o.price) + "</span></label>";
+      });
+      h += "</div>";
+    }
+    if (q.terms.length) {
+      h += '<div class="group"><div class="group-label">Terms &amp; Conditions</div><details><summary>Read the Terms &amp; Conditions</summary><div class="terms">';
+      q.terms.forEach(function (t, i) { h += "<h4>" + (i + 1) + ". " + esc(t[0]) + "</h4><p>" + esc(t[1]) + "</p>"; });
+      h += '</div></details><label class="check"><input type="checkbox" id="agree"><span class="t">I have read and agree to the Terms &amp; Conditions.</span></label></div>';
+    }
+    h += '<div class="group"><label class="name" for="signame">Type your full name to sign</label>' +
+         '<input type="text" id="signame" autocomplete="name" maxlength="160" placeholder="Your full name">' +
+         '<div class="sig-preview" id="sigprev" aria-hidden="true"></div></div>' +
+         '<button class="go" id="go" type="button">Accept quote</button><div class="err" id="err"></div>' +
+         '<p class="fine">By clicking Accept quote you accept this quote' + (q.terms.length ? " and its terms" : "") +
+         '. We record your name, the date and time, and your IP address with your acceptance.</p>';
+    $("accept").innerHTML = h;
+    $("signame").addEventListener("input", function () { $("sigprev").textContent = this.value; });
+    $("go").addEventListener("click", function () { submit(q); });
+  }
+
+  function showErr(t) { var e = $("err"); e.textContent = t; e.style.display = "block"; }
+
+  function submit(q) {
+    var name = $("signame").value.trim();
+    if (name.length < 2) { showErr("Please type your full name to sign."); return; }
+    if (q.terms.length && !$("agree").checked) { showErr("Please tick the box to agree to the terms."); return; }
+    var opts = [].slice.call(document.querySelectorAll('input[name=opt]:checked')).map(function (c) { return parseInt(c.value, 10); });
+    var btn = $("go"); btn.disabled = true; btn.textContent = "Accepting…"; $("err").style.display = "none";
+    fetch(API, { method: "POST", headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify({ t: token, name: name, agree: q.terms.length ? $("agree").checked : true, optional: opts }) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        if (res.ok && res.j.ok) { done(res.j.accepted); window.scrollTo({ top: $("accept").offsetTop - 20, behavior: "smooth" }); }
+        else { showErr((res.j && res.j.error) || "Something went wrong. Please try again."); btn.disabled = false; btn.textContent = "Accept quote"; }
+      })
+      .catch(function () { showErr("We couldn't reach our server. Please try again in a minute, or email " + CONTACT + "."); btn.disabled = false; btn.textContent = "Accept quote"; });
+  }
+
+  if (!/^[a-f0-9]{32,64}$/.test(token)) { fail("Quote link not valid", "Please use the link from your quote email, or contact us."); return; }
+
+  fetch(API + "?t=" + encodeURIComponent(token))
+    .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (res) {
+      var q = res.j;
+      if (!res.ok || !q.ok) { fail("We couldn't find that quote", (q && q.error) || "Please check the link or contact us."); return; }
+      document.title = "Quote #" + q.number + " | Modern Ops";
+      $("paper").innerHTML = q.html;          // built and escaped by HQ
+      $("loading").style.display = "none";
+      $("quote").style.display = "block";
+      if (q.accepted) done(q.accepted);
+      else if (q.status === "declined") $("accept").innerHTML = '<div class="msg" style="padding:1rem">This quote is no longer open. Please contact us at <a href="mailto:' + CONTACT + '">' + CONTACT + "</a>.</div>";
+      else if (q.expired) $("accept").innerHTML = '<div class="msg" style="padding:1rem"><strong>This quote expired on ' + esc(q.valid_until) + '.</strong><br>Contact us at <a href="mailto:' + CONTACT + '">' + CONTACT + "</a> and we'll send an updated one.</div>";
+      else form(q);
+    })
+    .catch(function () { fail("We couldn't load your quote right now", "Please try again in a few minutes, or contact us."); });
+})();
+</script>
+</body>
+</html>

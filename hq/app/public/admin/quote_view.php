@@ -3,6 +3,7 @@
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_billing.php';
+require_once __DIR__ . '/_quote_render.php';
 require_login();
 require_product('quotes');
 
@@ -26,6 +27,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         db()->prepare('DELETE FROM quote_items WHERE quote_id=?')->execute([$id]);
         db()->prepare('DELETE FROM quotes WHERE id=?')->execute([$id]);
         header('Location: quotes.php'); exit;
+    } elseif ($a === 'make_link') {
+        quote_accept_url($id);
+        header('Location: quote_view.php?id=' . $id); exit;
     } elseif ($a === 'status') {
         $s = $_POST['status'] ?? 'draft';
         if (in_array($s, ['draft','sent','accepted','declined'], true)) {
@@ -39,6 +43,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $it = db()->prepare('SELECT * FROM quote_items WHERE quote_id=? ORDER BY sort_order, id');
 $it->execute([$id]);
 $items = $it->fetchAll();
+$allItems = $items;
+// Re-read the quote so the link and acceptance fields are current
+[$q] = quote_load($id);
+$q['biz_email'] = $q['biz_email'] ?? '';
 // Optional add-ons are listed separately and never counted in totals.
 $optItems = array_filter($items, fn($i) => !empty($i['is_optional']));
 $items = array_filter($items, fn($i) => empty($i['is_optional']));
@@ -112,71 +120,50 @@ if ($costed):
 </div>
 <?php endif; ?>
 
-<!-- Paper preview (mirrors the PDF) -->
-<?php $deep = e(brand_color('deep', '<?= $deep ?>')); $tint = e(brand_color('tint', '<?= $tint ?>')); ?>
-<div class="card" style="background:#fff;color:#1a1a1a;max-width:780px;margin:0 auto;padding:2.2rem 2.4rem;font-family:Arial,Helvetica,sans-serif">
-  <div style="font-weight:800;letter-spacing:.14em;color:<?= $deep ?>;font-size:1.3rem"><?= e(mb_strtoupper((string) client('name'))) ?></div>
-  <div style="color:#555;font-size:.72rem;margin:.25rem 0 1.1rem;border-bottom:2px solid <?= $deep ?>;padding-bottom:.8rem"><?= implode(' &nbsp;|&nbsp; ', array_map('e', array_filter([client('tagline'), client('domain'), client('location')]))) ?></div>
-  <div style="color:<?= $deep ?>;font-size:1.1rem;letter-spacing:.04em;margin:.3rem 0 1rem;font-weight:700">QUOTE</div>
-  <div style="font-size:.82rem;line-height:1.9;margin-bottom:1rem">
-    <?php if ($preparedFor): ?><div><b style="color:<?= $deep ?>;display:inline-block;width:110px">Prepared for:</b> <?= e($preparedFor) ?></div><?php endif; ?>
-    <div><b style="color:<?= $deep ?>;display:inline-block;width:110px">Business:</b> <?= e($bizName) ?></div>
-    <div><b style="color:<?= $deep ?>;display:inline-block;width:110px">Quote date:</b> <?= e(date('M j, Y', strtotime($q['issue_date']))) ?></div>
-    <div><b style="color:<?= $deep ?>;display:inline-block;width:110px">Quote #:</b> <?= e($q['quote_number']) ?></div>
+<?php
+// Customer link + online acceptance
+$acceptOn = trim((string) client('quotes.accept_page', '')) !== '';
+$link = ($acceptOn && !empty($q['public_token'])) ? quote_accept_url($id) : '';
+$chosen = [];
+if (!empty($q['accepted_optional'])) {
+    $ids = array_map('intval', (array) json_decode((string) $q['accepted_optional'], true));
+    foreach ($optItems as $r) if (in_array((int)$r['id'], $ids, true)) $chosen[] = $r['title'];
+}
+?>
+<?php if ($acceptOn): ?>
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap">
+    <strong>Customer link</strong>
+    <?php if (!$link): ?>
+      <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="make_link"><button class="btn secondary small">Create link</button></form>
+    <?php endif; ?>
   </div>
-
-  <?php if (trim((string)$q['scope_of_work']) !== ''): ?>
-    <div style="background:<?= $tint ?>;color:<?= $deep ?>;font-weight:700;font-size:.72rem;letter-spacing:.05em;padding:.4rem .6rem">SCOPE OF WORK</div>
-    <div style="font-size:.8rem;color:#333;padding:.6rem .2rem;white-space:pre-wrap"><?= e($q['scope_of_work']) ?></div>
+  <?php if ($link): ?>
+    <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
+      <input type="text" id="qlink" value="<?= e($link) ?>" readonly style="flex:1;min-width:240px;font-size:.85rem">
+      <button type="button" class="btn secondary small" onclick="var i=document.getElementById('qlink');i.select();try{navigator.clipboard.writeText(i.value);}catch(e){document.execCommand('copy');}this.textContent='Copied';">Copy</button>
+      <a href="<?= e($link) ?>" target="_blank" rel="noopener" class="btn secondary small">Open</a>
+    </div>
+    <div class="muted" style="font-size:.82rem;margin-top:.5rem">
+      The customer can view the quote, choose optional add-ons and accept it online. The link is in the quote email and on the PDF.
+      <?= $q['viewed_at'] ? ' First opened ' . e(date('M j, g:ia', strtotime($q['viewed_at']))) . '.' : ' Not opened yet.' ?>
+    </div>
+  <?php else: ?>
+    <div class="muted" style="font-size:.82rem;margin-top:.4rem">A link is created automatically when you email the quote or download the PDF.</div>
   <?php endif; ?>
-
-  <?php if ($one): ?>
-    <div style="background:<?= $tint ?>;color:<?= $deep ?>;font-weight:700;font-size:.72rem;letter-spacing:.05em;padding:.4rem .6rem;margin-top:.8rem">ONE-TIME SERVICES</div>
-    <table style="width:100%;border-collapse:collapse">
-      <?php foreach ($one as $r): $lt=(float)$r['quantity']*(float)$r['unit_price']; ?>
-        <?php if (!empty($r['is_section'])): ?><tr><td colspan="2" style="padding:.8rem .6rem .3rem;font-weight:700;color:<?= $deep ?>;font-size:.82rem;border-bottom:1.5px solid <?= $deep ?>"><?= e($r['title']) ?></td></tr><?php continue; endif; ?>
-        <tr><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd"><div style="font-weight:700"><?= e($r['title']) ?><?= (float)$r['quantity']>1 ? ' ×'.rtrim(rtrim(number_format((float)$r['quantity'],2),'0'),'.') : '' ?></div><div style="color:#555;font-size:.76rem"><?= e($r['description']) ?></div></td><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd;text-align:right;font-weight:700;white-space:nowrap"><?= money($lt) ?></td></tr>
-      <?php endforeach; ?>
-    </table>
+  <?php if (!empty($q['accepted_at'])): ?>
+    <div class="flash ok" style="margin:.8rem 0 0">
+      Accepted online by <strong><?= e($q['accepted_name']) ?></strong> on <?= e(date('M j, Y \a\t g:ia', strtotime($q['accepted_at']))) ?>
+      <?= $q['accepted_ip'] ? ' · IP ' . e($q['accepted_ip']) : '' ?>.
+      <?= $chosen ? '<br>Also chose these optional add-ons: <strong>' . e(implode(', ', $chosen)) . '</strong>. Move them into the quote if you want them in the totals.' : '' ?>
+    </div>
   <?php endif; ?>
+</div>
+<?php endif; ?>
 
-  <?php if ($mo): ?>
-    <div style="background:<?= $tint ?>;color:<?= $deep ?>;font-weight:700;font-size:.72rem;letter-spacing:.05em;padding:.4rem .6rem;margin-top:1rem"><?= e($recBand) ?></div>
-    <table style="width:100%;border-collapse:collapse">
-      <?php foreach ($mo as $r): $lt=(float)$r['quantity']*(float)$r['unit_price']; ?>
-        <?php if (!empty($r['is_section'])): ?><tr><td colspan="2" style="padding:.8rem .6rem .3rem;font-weight:700;color:<?= $deep ?>;font-size:.82rem;border-bottom:1.5px solid <?= $deep ?>"><?= e($r['title']) ?></td></tr><?php continue; endif; ?>
-        <tr><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd"><div style="font-weight:700"><?= e($r['title']) ?></div><div style="color:#555;font-size:.76rem"><?= e($r['description']) ?></div></td><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd;text-align:right;font-weight:700;white-space:nowrap"><?= money($lt) ?><?= e(billing_suffix($r['billing'])) ?></td></tr>
-      <?php endforeach; ?>
-    </table>
-  <?php endif; ?>
-
-  <table style="width:100%;margin-top:1rem;font-size:.85rem"><tr>
-    <td style="text-align:right;padding:.2rem .6rem;color:#555">Subtotal</td><td style="text-align:right;padding:.2rem .6rem;width:120px"><?= money($oneSub) ?></td>
-  </tr>
-  <?php if ($taxRate > 0): ?><tr><td style="text-align:right;padding:.2rem .6rem;color:#555"><?= e($q['tax_label']) ?> (<?= rtrim(rtrim(number_format($taxRate,3),'0'),'.') ?>%)</td><td style="text-align:right;padding:.2rem .6rem"><?= money($tax) ?></td></tr><?php endif; ?>
-  </table>
-
-  <div style="display:flex;justify-content:flex-end;gap:0;margin-top:.8rem;flex-wrap:wrap">
-    <?php if ($one || $taxRate>0): ?><div style="background:<?= $tint ?>;color:<?= $deep ?>;padding:.7rem 1.1rem;font-weight:700;font-size:.8rem;text-align:center;min-width:150px">ONE-TIME TOTAL<br><?= money($oneTotal) ?></div><?php endif; ?>
-    <?php foreach ($recTotals as $bk => $bt): ?><div style="background:<?= $deep ?>;color:#fff;padding:.7rem 1.1rem;font-weight:700;font-size:.8rem;text-align:center;min-width:150px;border-left:1px solid #2a5a45"><?= e(billing_periods()[$bk][3]) ?><br><?= money($bt) . e(billing_suffix($bk)) ?></div><?php endforeach; ?>
-  </div>
-
-  <?php if ($optItems): ?>
-    <div style="background:<?= $tint ?>;color:<?= $deep ?>;font-weight:700;font-size:.72rem;letter-spacing:.05em;padding:.4rem .6rem;margin-top:1.4rem">OPTIONAL ADD-ONS</div>
-    <div style="font-size:.74rem;color:#555;padding:.4rem .6rem 0">Not included in the totals above. Let us know if you would like to add any of these.</div>
-    <table style="width:100%;border-collapse:collapse">
-      <?php foreach ($optItems as $r): $lt=(float)$r['quantity']*(float)$r['unit_price']; ?>
-        <?php if (!empty($r['is_section'])): ?><tr><td colspan="2" style="padding:.8rem .6rem .3rem;font-weight:700;color:<?= $deep ?>;font-size:.82rem;border-bottom:1.5px solid <?= $deep ?>"><?= e($r['title']) ?></td></tr><?php continue; endif; ?>
-        <tr><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd"><div style="font-weight:700"><?= e($r['title']) ?><?= (float)$r['quantity']>1 ? ' ×'.rtrim(rtrim(number_format((float)$r['quantity'],2),'0'),'.') : '' ?></div><div style="color:#555;font-size:.76rem"><?= e($r['description']) ?></div></td><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd;text-align:right;font-weight:700;white-space:nowrap"><?= money($lt) ?><?= e(billing_suffix($r['billing'])) ?></td></tr>
-      <?php endforeach; ?>
-    </table>
-  <?php endif; ?>
-
-  <?php if (trim((string)$q['notes']) !== ''): ?>
-    <div style="margin-top:1.4rem;font-size:.78rem;color:#333"><div style="color:<?= $deep ?>;font-weight:700;letter-spacing:.05em;margin-bottom:.3rem">NOTES</div><div style="white-space:pre-wrap"><?= e($q['notes']) ?></div></div>
-  <?php endif; ?>
-  <?php if ($q['terms_included']): ?><div style="margin-top:.8rem;font-size:.74rem;color:#777">Terms &amp; Conditions and a signature page are included in the PDF.</div><?php endif; ?>
-  <div style="text-align:center;color:#777;font-style:italic;font-size:.74rem;margin-top:1.4rem;border-top:1px solid #eee;padding-top:1rem"><?= e(client('quotes.thank_you')) ?><br>Questions? Contact us at <?= e(client('email.contact')) ?></div>
+<!-- The quote as the customer sees it (same layout as the PDF and the accept page) -->
+<div class="card" style="background:#fff;max-width:820px;margin:0 auto;padding:2.2rem 2.4rem">
+  <?= quote_paper_html($q, $allItems, $link) ?>
 </div>
 <?php
 layout_footer();

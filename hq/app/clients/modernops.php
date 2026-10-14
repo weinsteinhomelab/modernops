@@ -13,8 +13,10 @@ return [
     'portal'    => 'HQ',                 // shown after the name in the top bar: "Modern Ops HQ"
     'monogram'  => 'MO',                 // favicon letters (first letter dark, rest white)
     'logo'      => '',                   // optional image URL for the top bar and login page; blank = text name
+    'logo_file' => 'public/brand/modernops.png', // PNG/JPG for quotes and PDFs (path inside hq/app); blank = name in text
     'tagline'   => 'Web & business operations for small businesses',
     'location'  => 'Serving clients across the US',
+    'timezone'  => 'America/New_York',   // dates and times in HQ, on quotes and acceptance records
     'domain'    => 'modern-ops.net',     // bare domain, no https://
     'site_origin' => 'https://modern-ops.net', // the website allowed to post leads to /api/submit.php
 
@@ -61,11 +63,20 @@ return [
         'first_number'  => '1001',
         'valid_days'    => 30,
         'margin'        => '30',          // default margin % on new lines
+        // Public page where customers view and accept a quote (?t=<token> is added). Blank = no online acceptance.
+        'accept_page'   => 'https://modern-ops.net/quote/',
+        // Shown on every quote after the totals. Plain sentences.
+        'next_steps'    => [
+            'Accept this quote online using the link on this quote, or sign and return the last page.',
+            'We send an invoice for the amount due on acceptance.',
+            'Once it is paid, we schedule the work and keep you posted along the way.',
+        ],
+        'payment'       => 'One-time fees are due when you accept this quote. Recurring fees are due at the start of each billing period. We accept check, bank transfer, or another payment method we agree on.',
         'notes'         => 'Quote valid for 30 days from issue date. Payment due upon acceptance.',
         'thank_you'     => 'Thank you for choosing Modern Ops. We look forward to working with you.',
         'file_prefix'   => 'Modern-Ops-Quote',
         'email_subject' => 'Your quote from Modern Ops (#{number})',
-        'email_body'    => "Hi {name},\n\nThank you for your interest in Modern Ops. Please find your quote attached as a PDF.\n\nIf you have any questions or would like to move forward, just reply to this email.\n\nBest regards,\nModern Ops\nquote@modern-ops.net\nmodern-ops.net",
+        'email_body'    => "Hi {name},\n\nThank you for your interest in Modern Ops. Please find your quote attached as a PDF.\n\nYou can also view and accept it online here:\n{link}\n\nIf you have any questions, just reply to this email.\n\nBest regards,\nModern Ops\nquote@modern-ops.net\nmodern-ops.net",
         'terms' => [
             ['Client Approval & Acceptance', 'The Client is responsible for reviewing all deliverables and communicating any concerns in writing prior to final approval. Once the Client approves a deliverable in writing (including via email), that item is considered complete and accepted as-is. Modern Ops shall not be held liable for any dissatisfaction arising from approved work. Requests to redo approved work will be treated as new work and billed accordingly.'],
             ['Payment Terms', 'All one-time fees are due upon acceptance of the quote unless otherwise agreed in writing. Recurring fees are due on the 1st of each billing period (monthly, quarterly, semi-annually or annually, as listed on the quote). Invoices not paid within 15 days of the due date may result in suspension of services. All fees paid are non-refundable once work has commenced. Modern Ops accepts payment via check, bank transfer, or any agreed-upon payment platform.'],

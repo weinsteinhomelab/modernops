@@ -163,23 +163,25 @@ Every page is built from `layout_header()` and `layout_footer()`.
 
 The quote preview on screen and the PDF must match line for line.
 
-1. Client name in capitals, `deep` color, then a grey line:
-   tagline | domain | location, with a `deep` rule under it.
-2. **QUOTE** heading, then Prepared for / Business / Quote date / Valid until / Quote #.
+1. Logo (or the client name) left, **QUOTE** and the number right, with a `deep` rule under it.
+   Then three columns: Prepared for, From, Quote details.
+2. Every PDF page has a grey footer: client name, domain, email, and "Page X of Y".
 3. **SCOPE OF WORK** band (`tint` background, `deep` text), if filled in.
 4. **ONE-TIME SERVICES** band and lines. Section headings the user added show as
    bold `deep` text with a rule under them.
 5. Recurring band below it, always below one-time: "MONTHLY RECURRING" if every
    recurring line is monthly, "RECURRING SERVICES" if there's a mix. Each line shows
    its period: /mo, /qtr, /6 mo, /yr.
-6. Subtotal and tax (only if the rate is above 0).
-7. Total boxes in a row: light **ONE-TIME TOTAL** (`tint`), then one dark box
-   (`deep`) per recurring period.
+6. Totals panel on the right (`tint`): Subtotal, tax (only if above 0), a dark (`deep`)
+   **Due on acceptance** bar, then **THEN** with one line per recurring period ("Every quarter  $100.00/qtr").
+7. Lines with a quantity above 1 show "2 x $52.00" under the description.
 8. **OPTIONAL ADD-ONS** band (if any): a grey italic line saying they are not in the
    totals, then the lines (with their own section headings and periods).
-9. Notes, then the thank-you line and contact email in grey italics.
-10. If included: Terms & Conditions page, then signatures (client name, Client,
-   Printed Name, Title).
+9. **NEXT STEPS** (from the client file) and the payment line, then a boxed "Ready to go ahead?"
+   link to accept online, or the "Accepted online by …" record once accepted.
+10. Notes, then the thank-you line and contact email in grey italics.
+11. If included: Terms & Conditions page, then signature lines (client name + date, client signature
+   + date, printed name, title). Once accepted online, the signature section shows the acceptance record instead.
 
 - Cost, margin and profit are **internal**. They never appear on the preview, the
   PDF, the email or anything the customer sees.

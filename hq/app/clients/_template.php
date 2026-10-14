@@ -10,8 +10,10 @@ return [
     'portal'    => 'HQ',                 // top bar shows "Client Business Name HQ"
     'monogram'  => 'CB',                 // 1–3 letters for the favicon and login tile
     'logo'      => '',                   // optional image URL; blank = text name
+    'logo_file' => '',                   // PNG/JPG for quotes and PDFs, e.g. 'public/brand/<slug>.png'; blank = name in text
     'tagline'   => 'What the business does, in one line',
     'location'  => 'Town, ST',
+    'timezone'  => 'America/New_York',   // e.g. America/Chicago, America/Denver, America/Los_Angeles
     'domain'    => 'clientdomain.com',
     'site_origin' => 'https://clientdomain.com', // their website, allowed to post leads in
 
@@ -53,6 +55,9 @@ return [
         'first_number'  => '1001',
         'valid_days'    => 30,
         'margin'        => '30',
+        'accept_page'   => '',               // e.g. 'https://clientdomain.com/quote/' once the accept page is on their site
+        'next_steps'    => [],               // e.g. ['Accept online or sign the last page.', 'We send an invoice.']
+        'payment'       => '',               // how and when they get paid, in one or two sentences
         'notes'         => 'Quote valid for 30 days from issue date.',
         'thank_you'     => 'Thank you for choosing Client Business Name.',
         'file_prefix'   => 'Client-Business-Quote',

@@ -29,10 +29,14 @@ $pdf = build_quote_pdf($id);
 if ($pdf === null) { header('Location: quote_view.php?id=' . $id . '&mailerr=1'); exit; }
 
 $greet = $q['first_name'] ?: $q['biz_name'];
-// Wording comes from the client file; {name} and {number} are filled in here.
-$fill = ['{name}' => $greet, '{number}' => $q['quote_number']];
+// Wording comes from the client file; {name}, {number} and {link} are filled in here.
+$link = quote_accept_url($id);
+$fill = ['{name}' => $greet, '{number}' => $q['quote_number'], '{link}' => $link];
 $subject = strtr((string) client('quotes.email_subject', 'Your quote (#{number})'), $fill);
-$body = strtr((string) client('quotes.email_body', "Hi {name},\n\nYour quote is attached as a PDF."), $fill);
+$tpl = (string) client('quotes.email_body', "Hi {name},\n\nYour quote is attached as a PDF.");
+if ($link === '') $tpl = preg_replace('/[^\n]*\n?\{link\}\n?/', '', $tpl);   // no accept page: drop the link lines
+elseif (strpos($tpl, '{link}') === false) $tpl .= "\n\nView and accept your quote online:\n{link}";
+$body = strtr($tpl, $fill);
 $name = quote_file_name($q['quote_number']);
 
 $ok = send_mail_pdf($toEmail, $subject, $body, $pdf, $name, QUOTE_MAIL_FROM, QUOTE_SMTP_USER, QUOTE_MAIL_FROM, QUOTE_MAIL_FROM_NAME);
