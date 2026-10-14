@@ -4,6 +4,7 @@
  * request, then emails a notification. Called cross-origin from the site.
  */
 require_once __DIR__ . '/../admin/_db.php';
+require_once __DIR__ . '/../admin/_mail.php';
 
 // --- CORS (allow the public website to post here) ---
 header('Access-Control-Allow-Origin: ' . SITE_ORIGIN);
@@ -65,8 +66,6 @@ $body = "New website request\n\n"
       . "Phone: $phone\n"
       . "Type: $type\n\n"
       . "Message:\n$message\n";
-$headers = 'From: ' . MAIL_FROM_NAME . ' <' . MAIL_FROM . ">\r\n";
-if ($email !== '') $headers .= 'Reply-To: ' . $email . "\r\n";
-@mail(NOTIFY_EMAIL, $subject, $body, $headers);
+send_mail(NOTIFY_EMAIL, $subject, $body, $email);
 
 echo json_encode(['ok' => true]);

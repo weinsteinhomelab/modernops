@@ -1,0 +1,8 @@
+# Never serve raw schema, docs, env, or shared include files over HTTP.
+# (PHP include() is filesystem-level, so the app still works normally.)
+<FilesMatch "\.(sql|md|sample|env|log)$">
+  Require all denied
+</FilesMatch>
+<FilesMatch "^(_.*|config)\.php$">
+  Require all denied
+</FilesMatch>
