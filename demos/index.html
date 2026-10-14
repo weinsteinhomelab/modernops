@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Client Previews — Modern Ops</title>
+<meta name="description" content="A private preview area where Modern Ops clients can review and play with their draft website before it goes live.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231a6b4a'/%3E%3Ctext%20x='16'%20y='21.5'%20font-family='Georgia,serif'%20font-size='16'%20font-weight='700'%20text-anchor='middle'%3E%3Ctspan%20fill='%231a1a1a'%3EM%3C/tspan%3E%3Ctspan%20fill='%23ffffff'%3EO%3C/tspan%3E%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Lato:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --black: #1a1a1a; --white: #fafaf8; --accent: #1a6b4a; --accent-light: #e8f4ee;
+    --accent-dark: #145239; --mid: #555; --border: #ddd; --card-bg: #ffffff;
+  }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Lato', sans-serif; background: var(--white); color: var(--black); font-size: 16px; line-height: 1.6; }
+  a { color: inherit; }
+
+  nav { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 6%; border-bottom: 1px solid var(--border); background: var(--white); position: sticky; top: 0; z-index: 100; }
+  .logo { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.4rem; color: var(--black); text-decoration: none; letter-spacing: -0.01em; }
+  .logo span { color: var(--accent); }
+  .nav-right { font-size: 0.85rem; color: var(--mid); font-weight: 500; }
+  .nav-right a { color: var(--accent); text-decoration: none; }
+  .nav-right a:hover { text-decoration: underline; }
+
+  header.hero { max-width: 1040px; margin: 0 auto; padding: 4.5rem 6% 2.5rem; }
+  .hero-tag { display: inline-block; background: var(--accent-light); color: var(--accent); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.35rem 0.85rem; border-radius: 4px; margin-bottom: 1.5rem; }
+  header.hero h1 { font-family: 'Playfair Display', serif; font-weight: 800; font-size: clamp(2.1rem, 4vw, 3rem); line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 1.1rem; }
+  header.hero h1 em { font-style: italic; color: var(--accent); }
+  header.hero p { font-size: 1.05rem; color: var(--mid); max-width: 620px; line-height: 1.75; }
+
+  .how { max-width: 1040px; margin: 0 auto; padding: 0 6%; }
+  .how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; margin: 2rem 0 1rem; }
+  .how-step { background: var(--accent-light); border-radius: 10px; padding: 1.5rem; }
+  .how-step .n { font-family: 'Playfair Display', serif; font-weight: 800; color: var(--accent); font-size: 1.3rem; margin-bottom: 0.4rem; }
+  .how-step h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.3rem; }
+  .how-step p { font-size: 0.88rem; color: var(--mid); line-height: 1.6; }
+
+  main { max-width: 1040px; margin: 0 auto; padding: 2.5rem 6% 4rem; }
+  .section-label { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.75rem; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; transition: box-shadow 0.2s, transform 0.2s; }
+  .card:hover { box-shadow: 0 12px 28px rgba(0,0,0,0.08); transform: translateY(-2px); }
+  .card-thumb { aspect-ratio: 16/9; background: var(--black); color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-size: 1.6rem; letter-spacing: 0.01em; position: relative; }
+  .card-thumb.doggy { background: #1a1208; color: #f7f3ee; }
+  .card-thumb.doggy em { font-style: italic; color: #c8bfb2; }
+  .card-status { position: absolute; top: 0.85rem; left: 0.85rem; font-family: 'Lato', sans-serif; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.28rem 0.6rem; border-radius: 4px; }
+  .status-review { background: #f3e2c8; color: #8a5a1e; }
+  .status-progress { background: #e8f4ee; color: var(--accent-dark); }
+  .status-soon { background: #eee; color: #777; }
+  .card-body { padding: 1.4rem 1.5rem 1.5rem; display: flex; flex-direction: column; flex: 1; }
+  .card-body h2 { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 1.35rem; margin-bottom: 0.15rem; }
+  .card-client { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mid); margin-bottom: 0.8rem; }
+  .card-body p { font-size: 0.92rem; color: var(--mid); line-height: 1.6; margin-bottom: 1.25rem; flex: 1; }
+  .card-meta { font-size: 0.78rem; color: #999; margin-bottom: 1rem; }
+  .card-actions { display: flex; gap: 0.75rem; align-items: center; }
+  .btn-primary { background: var(--accent); color: #fff; padding: 0.6rem 1.25rem; border-radius: 6px; text-decoration: none; font-weight: 700; font-size: 0.85rem; transition: opacity 0.2s; }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-disabled { background: #eee; color: #999; padding: 0.6rem 1.25rem; border-radius: 6px; font-weight: 700; font-size: 0.85rem; cursor: default; }
+  .btn-link { color: var(--accent); font-weight: 700; font-size: 0.85rem; text-decoration: none; }
+  .btn-link:hover { text-decoration: underline; }
+
+  .note { background: var(--accent-light); border: 1px solid #cfe5d9; border-radius: 10px; padding: 1.25rem 1.5rem; margin-top: 2.5rem; font-size: 0.9rem; color: var(--accent-dark); line-height: 1.7; }
+  .note strong { color: var(--accent-dark); }
+
+  footer { border-top: 1px solid var(--border); padding: 2rem 6%; max-width: 1040px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; font-size: 0.82rem; color: #999; }
+  footer a { color: var(--accent); text-decoration: none; }
+
+  @media (max-width: 760px) {
+    .cards, .how-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">Modern<span>Ops</span></a>
+  <div class="nav-right">Private preview area · <a href="/">Main site</a></div>
+</nav>
+
+<header class="hero">
+  <span class="hero-tag">Client Previews</span>
+  <h1>Your website, <em>before it goes live.</em></h1>
+  <p>This is a private staging area where we park draft sites so you can click around, show the family, and tell us what to change — all before anything is public. Nothing here is indexed by Google, and none of the contact forms send real messages yet.</p>
+</header>
+
+<section class="how">
+  <div class="how-grid">
+    <div class="how-step">
+      <div class="n">1</div>
+      <h3>Open your preview</h3>
+      <p>Click “View preview” on your project below. It opens the full draft, just like a real website.</p>
+    </div>
+    <div class="how-step">
+      <div class="n">2</div>
+      <h3>Play around</h3>
+      <p>Scroll, tap buttons, try it on your phone. Forms are safe to test — they won't send anything.</p>
+    </div>
+    <div class="how-step">
+      <div class="n">3</div>
+      <h3>Tell us what to change</h3>
+      <p>Jot down anything — wording, colors, photos, prices — and send it over. We'll revise and re-post.</p>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div class="section-label">Projects in preview</div>
+  <div class="cards">
+
+    <article class="card">
+      <div class="card-thumb doggy">
+        <span class="card-status status-review">Ready for review</span>
+        Doggy <em>Spa</em>
+      </div>
+      <div class="card-body">
+        <h2>Doggy Spa</h2>
+        <div class="card-client">Dog grooming · Philadelphia, PA</div>
+        <p>A warm, editorial one-page site for a small grooming shop — services, pricing by dog size, the team, reviews, an FAQ, and a booking request form.</p>
+        <div class="card-meta">Updated Oct 2026 · Single page · Mobile-ready</div>
+        <div class="card-actions">
+          <a href="doggy-spa/" class="btn-primary">View preview →</a>
+          <a href="doggy-spa/" class="btn-link" target="_blank" rel="noopener">Open in new tab</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-thumb">
+        <span class="card-status status-soon">Slot open</span>
+        Your project here
+      </div>
+      <div class="card-body">
+        <h2>Next client</h2>
+        <div class="card-client">Awaiting kickoff</div>
+        <p>This is where the next draft will live. Each project gets its own private link you can share with just the people who need to see it.</p>
+        <div class="card-meta">Add a folder under <code>/demos/</code> to publish a new preview</div>
+        <div class="card-actions">
+          <span class="btn-disabled">Coming soon</span>
+        </div>
+      </div>
+    </article>
+
+  </div>
+
+  <div class="note">
+    <strong>A quick note on privacy:</strong> these previews live at an unlisted address and are set to <em>no-index</em>, so search engines skip them — but anyone with the link can open them. Don't post the links publicly. When a site is approved, we move it to its own real domain and take the preview down.
+  </div>
+</main>
+
+<footer>
+  <span>Modern Ops · Client preview area</span>
+  <span>Questions about your preview? <a href="/#contact">Get in touch →</a></span>
+</footer>
+
+</body>
+</html>

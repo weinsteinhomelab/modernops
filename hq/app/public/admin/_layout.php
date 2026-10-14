@@ -2,6 +2,7 @@
 /** Shared page chrome for the admin dashboard (dark/light, mobile). */
 
 function layout_header(string $title, string $active = ''): void {
+    $site = defined('SITE_ORIGIN') ? SITE_ORIGIN : 'https://modern-ops.net';
     $nav = [
         'index.php'     => 'Dashboard',
         'requests.php'  => 'Requests',
@@ -9,6 +10,7 @@ function layout_header(string $title, string $active = ''): void {
         'quotes.php'    => 'Quotes',
         'catalog.php'   => 'Catalog',
         'email.php'     => 'Email',
+        rtrim($site, '/') . '/demos/' => 'Previews',
     ];
     ?><!DOCTYPE html>
 <html lang="en">
@@ -89,8 +91,8 @@ function layout_header(string $title, string $active = ''): void {
   <div style="display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap">
     <a class="brand" href="index.php">Modern Ops <b>HQ</b></a>
     <nav class="main">
-      <?php foreach ($nav as $href => $label): ?>
-        <a href="<?= $href ?>"<?= $active === $href ? ' class="active"' : '' ?>><?= $label ?></a>
+      <?php foreach ($nav as $href => $label): $ext = (strncmp($href, 'http', 4) === 0); ?>
+        <a href="<?= e($href) ?>"<?= $active === $href ? ' class="active"' : '' ?><?= $ext ? ' target="_blank" rel="noopener"' : '' ?>><?= $label ?><?= $ext ? ' <span aria-hidden="true" style="opacity:.6;font-size:.8em">&#8599;</span>' : '' ?></a>
       <?php endforeach; ?>
     </nav>
   </div>
