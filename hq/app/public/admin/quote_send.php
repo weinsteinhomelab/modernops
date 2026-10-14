@@ -1,5 +1,5 @@
 <?php
-/** Email a quote PDF to the customer, from quotes@modern-ops.net. */
+/** Email a quote PDF to the customer, from quote@modern-ops.net. */
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_mail.php';
 require_once __DIR__ . '/_quote_pdf.php';
@@ -31,7 +31,7 @@ $subject = 'Your quote from Modern Ops (#' . $q['quote_number'] . ')';
 $body = "Hi " . $greet . ",\n\n"
       . "Thank you for your interest in Modern Ops. Please find your quote attached as a PDF.\n\n"
       . "If you have any questions or would like to move forward, just reply to this email.\n\n"
-      . "Best regards,\nModern Ops\nquotes@modern-ops.net\nmodern-ops.net";
+      . "Best regards,\nModern Ops\nquote@modern-ops.net\nmodern-ops.net";
 $name = 'Modern-Ops-Quote-' . preg_replace('/[^A-Za-z0-9_-]/', '', (string)$q['quote_number']) . '.pdf';
 
 $ok = send_mail_pdf($toEmail, $subject, $body, $pdf, $name, QUOTE_MAIL_FROM, QUOTE_SMTP_USER, QUOTE_MAIL_FROM, QUOTE_MAIL_FROM_NAME);
