@@ -7,6 +7,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Modern Ops — Digital Solutions for Small Business</title>
+
+<!-- Inline SVG favicon: rounded green square with serif "MO" (M black, O white) -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231a6b4a'/%3E%3Ctext%20x='16'%20y='21.5'%20font-family='Georgia,serif'%20font-size='16'%20font-weight='700'%20text-anchor='middle'%3E%3Ctspan%20fill='%231a1a1a'%3EM%3C/tspan%3E%3Ctspan%20fill='%23ffffff'%3EO%3C/tspan%3E%3C/text%3E%3C/svg%3E">
+
+<script>document.documentElement.className += ' js';</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Lato:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -399,6 +404,46 @@
     max-width: 1100px;
     margin: 0 auto;
   }
+
+  /* ---------- Motion: tasteful scroll-reveal + hero intro ----------
+     Hidden state only applies when JS is on (.js) so no-JS users still
+     see all content. Fully disabled under prefers-reduced-motion.      */
+  .js .reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    will-change: opacity, transform;
+  }
+
+  .js .reveal.in-view {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Stagger: each item delayed by its index (--i) for a cascade */
+  .js .stagger { transition-delay: calc(var(--i, 0) * 80ms); }
+
+  /* Hero text + buttons fade/slide in on page load */
+  .js .hero-animate {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: heroIntro 0.5s ease forwards;
+    animation-delay: var(--d, 0ms);
+  }
+
+  @keyframes heroIntro {
+    to { opacity: 1; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .js .reveal,
+    .js .hero-animate {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+      animation: none !important;
+    }
+  }
 </style>
 </head>
 <body>
@@ -414,15 +459,15 @@
 
 <div class="hero">
   <div>
-    <div class="hero-tag">Small Business Digital Solutions</div>
-    <h1>Your business, <em>built</em> for the modern world.</h1>
-    <p>Modern Ops helps small businesses across the Delaware Valley get online and get organized — affordably and without the headache.</p>
-    <div class="hero-btns">
+    <div class="hero-tag hero-animate" style="--d:0ms">Small Business Digital Solutions</div>
+    <h1 class="hero-animate" style="--d:70ms">Your business, <em>built</em> for the modern world.</h1>
+    <p class="hero-animate" style="--d:140ms">Modern Ops helps small businesses across the Delaware Valley get online and get organized — affordably and without the headache.</p>
+    <div class="hero-btns hero-animate" style="--d:210ms">
       <a href="#contact" class="btn-primary">Get a free quote</a>
       <a href="#services" class="btn-secondary">See our services</a>
     </div>
   </div>
-  <div class="hero-visual">
+  <div class="hero-visual hero-animate" style="--d:180ms">
     <div class="hero-stat">
       <div class="hero-stat-label">Website Setup</div>
       <div class="hero-stat-value">Done in days</div>
@@ -441,12 +486,12 @@
 <hr class="divider">
 
 <section id="services">
-  <div class="section-label">What We Do</div>
-  <div class="section-title">Everything your business needs to thrive online.</div>
-  <p class="section-sub">From your first website to ongoing support, we handle the tech so you can focus on running your business.</p>
+  <div class="section-label reveal stagger" style="--i:0">What We Do</div>
+  <div class="section-title reveal stagger" style="--i:1">Everything your business needs to thrive online.</div>
+  <p class="section-sub reveal stagger" style="--i:2">From your first website to ongoing support, we handle the tech so you can focus on running your business.</p>
   <div class="services-grid">
 
-    <div class="service-card">
+    <div class="service-card reveal stagger" style="--i:0">
       <div class="service-icon">
         <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
       </div>
@@ -454,7 +499,7 @@
       <p>Professional, mobile-friendly websites built from scratch. We handle design, hosting, domain setup, and everything in between.</p>
     </div>
 
-    <div class="service-card">
+    <div class="service-card reveal stagger" style="--i:1">
       <div class="service-icon">
         <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
       </div>
@@ -462,7 +507,7 @@
       <p>Get a professional email that matches your domain — like you@yourbusiness.com. No more Gmail for client correspondence.</p>
     </div>
 
-    <div class="service-card">
+    <div class="service-card reveal stagger" style="--i:2">
       <div class="service-icon">
         <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       </div>
@@ -470,7 +515,7 @@
       <p>Security patches, uptime monitoring, and backups handled every month so your site stays safe and always online.</p>
     </div>
 
-    <div class="service-card">
+    <div class="service-card reveal stagger" style="--i:3">
       <div class="service-icon">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
       </div>
@@ -478,31 +523,39 @@
       <p>Need to update your hours, swap a photo, or change some text? We're here. Content updates handled for you, no tech knowledge needed.</p>
     </div>
 
+    <div class="service-card reveal stagger" style="--i:4">
+      <div class="service-icon">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5"/><circle cx="5" cy="5" r="1.5"/><circle cx="19" cy="5" r="1.5"/><circle cx="5" cy="19" r="1.5"/><circle cx="19" cy="19" r="1.5"/><path d="M6.4 6.4l3.8 3.8M17.6 6.4l-3.8 3.8M6.4 17.6l3.8-3.8M17.6 17.6l-3.8-3.8"/></svg>
+      </div>
+      <h3>AI & Automation Setup</h3>
+      <p>We identify the tasks that eat up your time — scheduling, follow-ups, data entry — and build simple automated workflows to handle them. More time for your business, less time on the grind.</p>
+    </div>
+
   </div>
 </section>
 
 <div class="steps-section" id="how">
   <div style="max-width: 1100px; margin: 0 auto;">
-    <div class="section-label">The Process</div>
-    <div class="section-title">Up and running in days, not weeks.</div>
-    <p class="section-sub">No jargon, no runaround — just a simple, straightforward process from start to finish.</p>
+    <div class="section-label reveal stagger" style="--i:0">The Process</div>
+    <div class="section-title reveal stagger" style="--i:1">Up and running in days, not weeks.</div>
+    <p class="section-sub reveal stagger" style="--i:2">No jargon, no runaround — just a simple, straightforward process from start to finish.</p>
     <div class="steps">
-      <div class="step">
+      <div class="step reveal stagger" style="--i:0">
         <div class="step-num">01</div>
         <h3>We talk</h3>
         <p>Tell us about your business and what you need. We'll put together a clear proposal with no surprises.</p>
       </div>
-      <div class="step">
+      <div class="step reveal stagger" style="--i:1">
         <div class="step-num">02</div>
         <h3>We build</h3>
         <p>We get to work on your website and setup. You'll see a draft before anything goes live.</p>
       </div>
-      <div class="step">
+      <div class="step reveal stagger" style="--i:2">
         <div class="step-num">03</div>
         <h3>You launch</h3>
         <p>Your site goes live. We walk you through everything so you're never left in the dark.</p>
       </div>
-      <div class="step">
+      <div class="step reveal stagger" style="--i:3">
         <div class="step-num">04</div>
         <h3>We've got your back</h3>
         <p>Ongoing maintenance means your site stays up, secure, and current — with us handling it all.</p>
@@ -513,9 +566,9 @@
 
 <div class="contact-section" id="contact">
   <div style="max-width: 1100px; margin: 0 auto;">
-    <div class="section-label">Contact</div>
-    <div class="section-title" style="font-family: 'Playfair Display', serif; font-weight: 800; font-size: clamp(1.75rem, 3vw, 2.4rem); color: #fafaf8; margin-bottom: 1rem;">Ready to modernize your business?</div>
-    <p class="section-sub">Fill out the form and we'll get back to you within 24 hours with a free, no-obligation quote.</p>
+    <div class="section-label reveal stagger" style="--i:0">Contact</div>
+    <div class="section-title reveal stagger" style="--i:1; font-family: 'Playfair Display', serif; font-weight: 800; font-size: clamp(1.75rem, 3vw, 2.4rem); color: #fafaf8; margin-bottom: 1rem;">Ready to modernize your business?</div>
+    <p class="section-sub reveal stagger" style="--i:2">Fill out the form and we'll get back to you within 24 hours with a free, no-obligation quote.</p>
     <div class="contact-grid">
       <div class="contact-info">
         <p>We work with small businesses across the Delaware Valley — from Philadelphia to the suburbs and beyond. Reach out and let's talk about what we can do for you.</p>
@@ -576,6 +629,32 @@
 <footer>
   <p>© 2026 Modern Ops · modern-ops.net · Delaware Valley, PA</p>
 </footer>
+
+<script>
+  /* Scroll-reveal via IntersectionObserver (no libraries).
+     Falls back to showing everything if IO is unsupported or the
+     visitor prefers reduced motion. */
+  (function () {
+    var els = document.querySelectorAll('.reveal');
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (reduce || !('IntersectionObserver' in window)) {
+      for (var i = 0; i < els.length; i++) { els[i].classList.add('in-view'); }
+      return;
+    }
+
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+    els.forEach(function (el) { io.observe(el); });
+  })();
+</script>
 
 </body>
 </html>
