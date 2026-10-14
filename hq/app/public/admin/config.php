@@ -36,6 +36,13 @@ define('QUOTE_SMTP_USER', envv('QUOTE_SMTP_USER', 'quotes@modern-ops.net'));
 define('QUOTE_MAIL_FROM', envv('QUOTE_MAIL_FROM', 'quotes@modern-ops.net'));
 define('QUOTE_MAIL_FROM_NAME', envv('QUOTE_MAIL_FROM_NAME', 'Modern Ops Quotes'));
 
+// ---- Reading mail (IMAP) ----
+define('IMAP_HOST', envv('IMAP_HOST', 'mail.modern-ops.net'));
+define('IMAP_PORT', (int) envv('IMAP_PORT', '993'));
+define('IMAP_ENCRYPTION', envv('IMAP_ENCRYPTION', 'ssl')); // ssl | tls | ''
+// The mailboxes shown in the Email tab (comma-separated). All share SMTP_PASS.
+define('MAIL_ACCOUNTS', envv('MAIL_ACCOUNTS', 'peter@modern-ops.net,info@modern-ops.net,service@modern-ops.net,quotes@modern-ops.net'));
+
 // ---- Business info shown on quotes ----
 define('BIZ_NAME',     envv('BIZ_NAME', 'Modern Ops'));
 define('BIZ_EMAIL',    envv('BIZ_EMAIL', 'info@modern-ops.net'));

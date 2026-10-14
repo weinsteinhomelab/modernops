@@ -1,0 +1,8 @@
+{
+    "require": {
+        "webklex/php-imap": "^5.3"
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

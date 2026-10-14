@@ -73,6 +73,14 @@ function send_mail(string $to, string $subject, string $body, string $replyTo = 
     return smtp_deliver($to, $msg);
 }
 
+/** Plain-text email sent from a specific mailbox (same shared password). */
+function send_plain(string $to, string $subject, string $body, string $fromUser, string $fromAddr, string $fromName = '', string $replyTo = ''): bool {
+    $msg = base_headers($to, $subject, $replyTo, $fromAddr, $fromName)
+         . "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
+         . $body;
+    return smtp_deliver($to, $msg, $fromUser, $fromAddr);
+}
+
 /** Email with a PDF attachment, optionally from a specific mailbox. */
 function send_mail_pdf(string $to, string $subject, string $body, string $pdfBytes, string $pdfName, string $replyTo = '', ?string $fromUser = null, ?string $fromAddr = null, ?string $fromName = null): bool {
     $boundary = 'MOHQ-' . bin2hex(random_bytes(10));

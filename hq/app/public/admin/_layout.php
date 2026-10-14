@@ -8,6 +8,7 @@ function layout_header(string $title, string $active = ''): void {
         'customers.php' => 'Customers',
         'quotes.php'    => 'Quotes',
         'catalog.php'   => 'Catalog',
+        'email.php'     => 'Email',
     ];
     ?><!DOCTYPE html>
 <html lang="en">
