@@ -13,21 +13,32 @@ try {
 if (current_user()) { header('Location: index.php'); exit; }
 
 $err = '';
+$ip = client_ip();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
-    $user = trim($_POST['username'] ?? '');
-    $pass = (string)($_POST['password'] ?? '');
-    $st = db()->prepare('SELECT * FROM admin_users WHERE username = ?');
-    $st->execute([$user]);
-    $row = $st->fetch();
-    if ($row && password_verify($pass, $row['password_hash'])) {
-        login_user($row);
-        header('Location: index.php');
-        exit;
+    [$locked, $wait] = throttle_status($ip);
+    if ($locked) {
+        $err = 'Too many failed attempts. Please try again in ' . fmt_wait($wait) . '.';
+    } else {
+        $user = trim($_POST['username'] ?? '');
+        $pass = (string)($_POST['password'] ?? '');
+        $st = db()->prepare('SELECT * FROM admin_users WHERE username = ?');
+        $st->execute([$user]);
+        $row = $st->fetch();
+        if ($row && password_verify($pass, $row['password_hash'])) {
+            record_attempt($ip, $user, true);
+            login_user($row);
+            header('Location: index.php');
+            exit;
+        }
+        record_attempt($ip, $user, false);
+        usleep(400000); // uniform small delay to blunt guessing
+        [$nowLocked, $nowWait] = throttle_status($ip);
+        $err = $nowLocked
+            ? 'Too many failed attempts. Please try again in ' . fmt_wait($nowWait) . '.'
+            : 'Incorrect username or password.';
     }
-    // Uniform small delay to blunt guessing
-    usleep(300000);
-    $err = 'Incorrect username or password.';
 }
 ?><!DOCTYPE html>
 <html lang="en">

@@ -69,3 +69,14 @@ CREATE TABLE IF NOT EXISTS settings (
   k VARCHAR(80) PRIMARY KEY,
   v TEXT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Records login attempts for brute-force throttling
+CREATE TABLE IF NOT EXISTS login_attempts (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  ip         VARCHAR(64) NOT NULL,
+  username   VARCHAR(80) DEFAULT NULL,
+  ok         TINYINT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX (ip),
+  INDEX (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
