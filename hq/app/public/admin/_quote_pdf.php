@@ -46,6 +46,9 @@ function build_quote_pdf(int $id): ?string {
 }
 
 function render_quote_pdf(array $q, array $items): string {
+    // Optional add-ons are listed after the totals and never counted in them.
+    $optItems = array_values(array_filter($items, fn($i) => !empty($i['is_optional'])));
+    $items = array_values(array_filter($items, fn($i) => empty($i['is_optional'])));
     $one = array_values(array_filter($items, fn($i) => billing_clean($i['billing']) === 'one_time'));
     $mo  = array_values(array_filter($items, fn($i) => billing_clean($i['billing']) !== 'one_time'));
     $recTotals = billing_recurring_totals($items);
@@ -146,6 +149,15 @@ function render_quote_pdf(array $q, array $items): string {
     if ($one || $rate > 0) { $drawBox($x, $yBox, 'ONE-TIME TOTAL', $m($oneTotal), quote_tint(), quote_deep()); $x += $boxW; }
     foreach ($recTotals as $bk => $bt) { $drawBox($x, $yBox, billing_periods()[$bk][3], $m($bt) . billing_suffix($bk), quote_deep(), [255,255,255]); $x += $boxW; }
     $pdf->SetXY($L, $yBox + $boxH + 4);
+
+    if ($optItems) {
+        $band('OPTIONAL ADD-ONS');
+        $pdf->SetFont('Arial', 'I', 8); $pdf->SetTextColor(...$GREY);
+        $pdf->MultiCell(0, 4.5, tx('Not included in the totals above. Let us know if you would like to add any of these.'), 0, 'L');
+        $pdf->Ln(1.5);
+        $renderRows($optItems);
+        $pdf->Ln(3);
+    }
 
     // Notes
     if (trim((string)$q['notes']) !== '') {

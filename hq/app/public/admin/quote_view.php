@@ -39,6 +39,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $it = db()->prepare('SELECT * FROM quote_items WHERE quote_id=? ORDER BY sort_order, id');
 $it->execute([$id]);
 $items = $it->fetchAll();
+// Optional add-ons are listed separately and never counted in totals.
+$optItems = array_filter($items, fn($i) => !empty($i['is_optional']));
+$items = array_filter($items, fn($i) => empty($i['is_optional']));
 $one = array_filter($items, fn($i) => billing_clean($i['billing']) === 'one_time');
 $mo  = array_filter($items, fn($i) => billing_clean($i['billing']) !== 'one_time');
 $recTotals = billing_recurring_totals($items);
@@ -157,6 +160,17 @@ if ($costed):
     <?php if ($one || $taxRate>0): ?><div style="background:<?= $tint ?>;color:<?= $deep ?>;padding:.7rem 1.1rem;font-weight:700;font-size:.8rem;text-align:center;min-width:150px">ONE-TIME TOTAL<br><?= money($oneTotal) ?></div><?php endif; ?>
     <?php foreach ($recTotals as $bk => $bt): ?><div style="background:<?= $deep ?>;color:#fff;padding:.7rem 1.1rem;font-weight:700;font-size:.8rem;text-align:center;min-width:150px;border-left:1px solid #2a5a45"><?= e(billing_periods()[$bk][3]) ?><br><?= money($bt) . e(billing_suffix($bk)) ?></div><?php endforeach; ?>
   </div>
+
+  <?php if ($optItems): ?>
+    <div style="background:<?= $tint ?>;color:<?= $deep ?>;font-weight:700;font-size:.72rem;letter-spacing:.05em;padding:.4rem .6rem;margin-top:1.4rem">OPTIONAL ADD-ONS</div>
+    <div style="font-size:.74rem;color:#555;padding:.4rem .6rem 0">Not included in the totals above. Let us know if you would like to add any of these.</div>
+    <table style="width:100%;border-collapse:collapse">
+      <?php foreach ($optItems as $r): $lt=(float)$r['quantity']*(float)$r['unit_price']; ?>
+        <?php if (!empty($r['is_section'])): ?><tr><td colspan="2" style="padding:.8rem .6rem .3rem;font-weight:700;color:<?= $deep ?>;font-size:.82rem;border-bottom:1.5px solid <?= $deep ?>"><?= e($r['title']) ?></td></tr><?php continue; endif; ?>
+        <tr><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd"><div style="font-weight:700"><?= e($r['title']) ?><?= (float)$r['quantity']>1 ? ' ×'.rtrim(rtrim(number_format((float)$r['quantity'],2),'0'),'.') : '' ?></div><div style="color:#555;font-size:.76rem"><?= e($r['description']) ?></div></td><td style="padding:.5rem .6rem;border-bottom:1px solid #ddd;text-align:right;font-weight:700;white-space:nowrap"><?= money($lt) ?><?= e(billing_suffix($r['billing'])) ?></td></tr>
+      <?php endforeach; ?>
+    </table>
+  <?php endif; ?>
 
   <?php if (trim((string)$q['notes']) !== ''): ?>
     <div style="margin-top:1.4rem;font-size:.78rem;color:#333"><div style="color:<?= $deep ?>;font-weight:700;letter-spacing:.05em;margin-bottom:.3rem">NOTES</div><div style="white-space:pre-wrap"><?= e($q['notes']) ?></div></div>

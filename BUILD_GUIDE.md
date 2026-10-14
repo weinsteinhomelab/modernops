@@ -165,6 +165,8 @@ admin_users, login_attempts   (login)
   `billing` puts a line in one-time or recurring; headings use `one_time` or
   `monthly` only to mark which area they sit in.
   `unit_cost` and `margin` are internal and never printed for the customer.
+  `is_optional = 1` marks an optional add-on: listed after the totals on the quote and
+  PDF, never counted in totals, the quote list or profit.
 - **Inbox** has no tables. Mail stays on the mail server and is read over IMAP.
 
 **Changing the schema**

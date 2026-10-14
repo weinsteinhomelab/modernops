@@ -175,8 +175,10 @@ The quote preview on screen and the PDF must match line for line.
 6. Subtotal and tax (only if the rate is above 0).
 7. Total boxes in a row: light **ONE-TIME TOTAL** (`tint`), then one dark box
    (`deep`) per recurring period.
-8. Notes, then the thank-you line and contact email in grey italics.
-9. If included: Terms & Conditions page, then signatures (client name, Client,
+8. **OPTIONAL ADD-ONS** band (if any): a grey italic line saying they are not in the
+   totals, then the lines (with their own section headings and periods).
+9. Notes, then the thank-you line and contact email in grey italics.
+10. If included: Terms & Conditions page, then signatures (client name, Client,
    Printed Name, Title).
 
 - Cost, margin and profit are **internal**. They never appear on the preview, the

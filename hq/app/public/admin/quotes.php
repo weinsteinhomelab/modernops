@@ -13,7 +13,7 @@ $rows = db()->query(
 
 // Totals per quote (one-time) for the list
 function quote_onetime_total(int $qid): float {
-    $st = db()->prepare("SELECT COALESCE(SUM(quantity*unit_price),0) FROM quote_items WHERE quote_id=? AND billing='one_time'");
+    $st = db()->prepare("SELECT COALESCE(SUM(quantity*unit_price),0) FROM quote_items WHERE quote_id=? AND billing='one_time' AND is_optional=0");
     $st->execute([$qid]);
     return (float)$st->fetchColumn();
 }

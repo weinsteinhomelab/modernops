@@ -32,7 +32,7 @@ function billing_recurring_totals(array $items): array {
     foreach (array_keys(billing_periods()) as $k) {
         if ($k === 'one_time') continue;
         $t = 0; $any = false;
-        foreach ($items as $r) if (empty($r['is_section']) && billing_clean($r['billing']) === $k) { $t += (float)$r['quantity'] * (float)$r['unit_price']; $any = true; }
+        foreach ($items as $r) if (empty($r['is_section']) && empty($r['is_optional']) && billing_clean($r['billing']) === $k) { $t += (float)$r['quantity'] * (float)$r['unit_price']; $any = true; }
         if ($any) $out[$k] = $t;
     }
     return $out;
