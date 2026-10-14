@@ -108,7 +108,7 @@ layout_header($b['name'], 'customers.php');
             <a href="<?= e($s['url']) ?>" target="_blank" rel="noopener" style="font-size:.85rem;word-break:break-all"><?= e(preg_replace('#^https?://#', '', rtrim($s['url'], '/'))) ?> &#8599;</a>
           </td>
           <td style="width:1%;white-space:nowrap">
-            <div class="row-actions">
+            <div class="row-actions" style="flex-wrap:nowrap">
               <form method="post" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="site_kind"><input type="hidden" name="site_id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="kind" value="<?= $live ? 'demo' : 'live' ?>"><button class="btn secondary small"><?= $live ? 'Back to demo' : 'Mark live' ?></button></form>
               <form method="post" onsubmit="return confirm('Remove this website from the customer?')" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="del_site"><input type="hidden" name="site_id" value="<?= (int)$s['id'] ?>"><button class="btn danger small" title="Remove">×</button></form>
             </div>

@@ -99,7 +99,10 @@ Every page is built from `layout_header()` and `layout_footer()`.
 
 - **Top bar:** dark, sticky, 56px tall. Client name + portal word on the left,
   then the nav. Theme toggle (◐), username and Log out on the right.
-- **Content:** centered column, max-width 1000px, side padding 5%, 1.75rem top.
+- **Content:** uses the full width of the screen, 2.5rem side padding (1rem on phones), 1.75rem top.
+  Edit forms lay their fields out across the page with `.grid-auto` (as many 220px+
+  columns as fit; one column on a phone). Only the quote preview stays page-sized,
+  because it mirrors the printed PDF.
 - **Page head:** `h1.page`, then one line of `.sub` text saying what the page is
   for. The main action (`.btn`, e.g. "+ New quote") sits top right.
 - **Body:** stacked `.card`s, 1.25rem apart. One job per card.
