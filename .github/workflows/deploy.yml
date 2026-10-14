@@ -17,9 +17,10 @@ jobs:
           SSH_PORT: ${{ secrets.SSH_PORT }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_PASSPHRASE: ${{ secrets.SSH_PASSPHRASE }}
         run: |
           missing=0
-          for name in SSH_HOST SSH_PORT SSH_USER SSH_PRIVATE_KEY; do
+          for name in SSH_HOST SSH_PORT SSH_USER SSH_PRIVATE_KEY SSH_PASSPHRASE; do
             if [ -z "${!name}" ]; then
               echo "::error::Secret $name is empty or not set. Add it under Settings -> Secrets and variables -> Actions -> Repository secrets."
               missing=1
