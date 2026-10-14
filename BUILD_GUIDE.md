@@ -42,6 +42,8 @@ hq/
     public/               web root (public_html on SiteGround)
       index.php           sends visitors to admin/
       api/submit.php      website contact form posts here (Ops Customers)
+      api/quote.php       public quote data + online acceptance (Ops Quotes)
+      brand/<slug>.png    client logo used on quotes and PDFs
       admin/              every page of the app
         _*.php            shared code, never served (blocked by .htaccess)
         config.php        reads the client file + .env (never served)
@@ -65,6 +67,7 @@ hq/
 | `_brand.php` | `brand_title()`, `brand_color()`, `hex_rgb()`, favicon, `product_name()`, `require_product()` |
 | `_migrate.php` | `SCHEMA_VERSION` + one `run_phaseN_migration()` per upgrade |
 | `_billing.php` | Billing periods (one-time, monthly, quarterly, semi-annual, annual) and their totals |
+| `_quote_render.php` | Quote data (`quote_load()`, `quote_numbers()`), the customer link (`quote_accept_url()`), and the quote HTML shown in HQ and on the accept page (`quote_paper_html()`) |
 | `_quote_pdf.php` | Builds the quote PDF; `quote_terms()`, `quote_file_name()` |
 | `_mail.php` | SMTP sending (plain + PDF attachment) |
 | `_imap.php` | Reading mailboxes for Ops Inbox; HTML email cleaning |
@@ -167,6 +170,10 @@ admin_users, login_attempts   (login)
   `unit_cost` and `margin` are internal and never printed for the customer.
   `is_optional = 1` marks an optional add-on: listed after the totals on the quote and
   PDF, never counted in totals, the quote list or profit.
+- **Online acceptance.** `quotes.public_token` is the customer link key (random, 32 hex). `api/quote.php`
+  returns the quote HTML for that token and records acceptance: `accepted_at`, `accepted_name`,
+  `accepted_ip`, `accepted_ua`, and the optional add-ons they ticked (`accepted_optional`, JSON ids).
+  It never returns cost, margin or profit. Status becomes `accepted` and the business is emailed.
 - **Inbox** has no tables. Mail stays on the mail server and is read over IMAP.
 
 **Changing the schema**
@@ -200,6 +207,10 @@ The code is identical for every client. Two things change:
 | `quotes.first_number`, `valid_days`, `margin`, `notes` | New-quote defaults |
 | `quotes.thank_you`, `file_prefix`, `email_subject`, `email_body` | Quote wording; `{name}` and `{number}` are filled in |
 | `quotes.terms` | Terms & Conditions page, as `[heading, text]` pairs |
+| `quotes.accept_page` | The page on the client's website where customers view and accept quotes (`?t=` is added). Blank turns online acceptance off |
+| `quotes.next_steps`, `quotes.payment` | The NEXT STEPS section on every quote |
+| `logo_file` | PNG/JPG (inside `hq/app`) printed on quotes and PDFs |
+| `timezone` | Time zone for every date HQ shows or saves |
 | `catalog` | Starting pricebook, used once to fill an empty Catalog |
 
 Read values with `client('quotes.tax_rate')`. Never hard-code a client's name,
@@ -311,6 +322,9 @@ addresses and the mailbox password.
    `email.accounts` loads.
 10. **Quotes** (Ops Quotes only). Build a test quote, download the PDF, email it to
     yourself, then delete it.
+    If they want online acceptance, copy `quote/index.html` from this repo to their website,
+    change `API` and `CONTACT` at the top of its script, and set `quotes.accept_page` to its address.
+    Accept a test quote end to end.
 11. **Backups.** Confirm SiteGround daily backups are on for the site.
 12. **Hand over:** login address, username, how to reset the password through us.
 

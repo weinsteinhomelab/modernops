@@ -18,6 +18,8 @@ function db(): PDO {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false,
             ]);
+            // Match the database clock to PHP's time zone so NOW() and created_at are local time too.
+            $pdo->exec("SET time_zone = '" . date('P') . "'");
         } catch (PDOException $ex) {
             http_response_code(500);
             exit('Database connection failed. Double-check the DB settings in admin/config.php.');

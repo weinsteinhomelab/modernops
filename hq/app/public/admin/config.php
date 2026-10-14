@@ -56,6 +56,9 @@ function product_on(string $p): bool {
     return (bool) client('products.' . $p, false);
 }
 
+// ---- Time zone: every date HQ shows or saves is in the client's local time ----
+date_default_timezone_set((string) client('timezone', 'America/New_York') ?: 'America/New_York');
+
 // ---- Database (the "db" service in docker-compose) ----
 define('DB_HOST', envv('DB_HOST', 'db'));
 define('DB_NAME', envv('DB_NAME', 'hq'));

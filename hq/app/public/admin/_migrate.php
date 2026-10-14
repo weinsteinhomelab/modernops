@@ -2,7 +2,7 @@
 /** Idempotent schema migrations so a live database upgrades itself safely. */
 require_once __DIR__ . '/_db.php';
 
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 /** Starting pricebook for an empty Catalog: the "catalog" list in the client file. */
 function catalog_defaults(): array {
@@ -146,6 +146,21 @@ function run_phase7_migration(): void {
     try { db()->exec("ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS is_optional TINYINT NOT NULL DEFAULT 0 AFTER is_section"); } catch (Exception $ex) {}
 }
 
+/** Phase 8: customer link + online acceptance on quotes. */
+function run_phase8_migration(): void {
+    $ddl = [
+        "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS public_token VARCHAR(64) DEFAULT NULL",
+        "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS viewed_at DATETIME DEFAULT NULL",
+        "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS accepted_at DATETIME DEFAULT NULL",
+        "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS accepted_name VARCHAR(160) DEFAULT NULL",
+        "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS accepted_ip VARCHAR(64) DEFAULT NULL",
+        "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS accepted_ua VARCHAR(255) DEFAULT NULL",
+        "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS accepted_optional TEXT DEFAULT NULL",
+        "CREATE UNIQUE INDEX IF NOT EXISTS quotes_public_token ON quotes (public_token)",
+    ];
+    foreach ($ddl as $sql) { try { db()->exec($sql); } catch (Exception $ex) {} }
+}
+
 function maybe_migrate(): void {
     try {
         $v = (int) (setting('schema_version', '1'));
@@ -156,6 +171,7 @@ function maybe_migrate(): void {
         if ($v < 5) run_phase5_migration();
         if ($v < 6) run_phase6_migration();
         if ($v < 7) run_phase7_migration();
+        if ($v < 8) run_phase8_migration();
         set_setting('schema_version', (string) SCHEMA_VERSION);
     } catch (Exception $ex) {}
 }
