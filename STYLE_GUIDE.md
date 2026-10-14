@@ -5,7 +5,7 @@ dashboard, and generated documents (quotes/PDFs). When in doubt, match what's
 already here.
 
 ## Brand & voice
-- **Who:** Modern Ops — web & business operations for small businesses, Delaware Valley, PA.
+- **Who:** Modern Ops — web & business operations for small businesses anywhere in the US (based in PA).
 - **Voice:** plain, confident, friendly. No jargon. Short sentences. Reassure
   non-technical owners ("we handle the tech so you can run your business").
 - **Never:** hype, buzzwords, pushy sales language.
