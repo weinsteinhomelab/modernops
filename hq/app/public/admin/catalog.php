@@ -2,7 +2,9 @@
 /** Saved line items (service catalog) — add, edit, retire. */
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
+require_once __DIR__ . '/_billing.php';
 require_login();
+require_product('quotes');
 
 $msg = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -17,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $title,
                 trim($_POST['description'] ?? ''),
                 (float)($_POST['unit_price'] ?? 0),
-                ($_POST['billing'] ?? 'one_time') === 'monthly' ? 'monthly' : 'one_time',
+                billing_clean($_POST['billing'] ?? 'one_time'),
             ]);
             $msg = 'Item added.';
         }
@@ -48,7 +50,7 @@ layout_header('Catalog', 'catalog.php');
     </div>
     <div class="grid2" style="grid-template-columns:1fr 1fr auto;align-items:end">
       <div><label>Unit price ($)</label><input type="number" step="0.01" min="0" name="unit_price" value="0"></div>
-      <div><label>Billing</label><select name="billing"><option value="one_time">One-time</option><option value="monthly">Monthly</option></select></div>
+      <div><label>Billing</label><select name="billing"><?= billing_options('one_time') ?></select></div>
       <div><button class="btn" type="submit">Add item</button></div>
     </div>
   </form>
@@ -66,8 +68,8 @@ layout_header('Catalog', 'catalog.php');
         <tr style="<?= $c['active'] ? '' : 'opacity:.5' ?>">
           <td><strong><?= e($c['title']) ?></strong></td>
           <td class="muted" style="font-size:.82rem"><?= e($c['description']) ?></td>
-          <td><?= money($c['unit_price']) ?><?= $c['billing']==='monthly' ? '/mo' : '' ?></td>
-          <td><?= $c['billing']==='monthly' ? 'Monthly' : 'One-time' ?></td>
+          <td><?= money($c['unit_price']) ?><?= e(billing_suffix($c['billing'])) ?></td>
+          <td><?= e(billing_label($c['billing'])) ?></td>
           <td><?= $c['active'] ? '<span class="badge won">Active</span>' : '<span class="badge closed">Retired</span>' ?></td>
           <td>
             <div class="row-actions">

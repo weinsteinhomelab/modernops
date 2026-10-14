@@ -2,7 +2,9 @@
 /** Business detail: info, address, contacts, touch points, notes, quotes, requests. */
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
+require_once __DIR__ . '/_sites.php';
 require_login();
+require_product('customers', 'quotes');
 
 $id = (int)($_GET['id'] ?? 0);
 $st = db()->prepare('SELECT * FROM businesses WHERE id = ?');
@@ -11,6 +13,7 @@ $b = $st->fetch();
 if (!$b) { http_response_code(404); layout_header('Not found','customers.php'); echo '<div class="card">Business not found. <a href="customers.php">Back</a></div>'; layout_footer(); exit; }
 
 $msg = '';
+$siteErr = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
     $a = $_POST['action'] ?? '';
@@ -23,6 +26,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg = 'Touch point logged.';
     } elseif ($a === 'del_tp') {
         db()->prepare('DELETE FROM touchpoints WHERE id=? AND business_id=?')->execute([(int)($_POST['tp_id'] ?? 0), $id]);
+    } elseif ($a === 'add_site') {
+        $kind = ($_POST['kind'] ?? '') === 'live' ? 'live' : 'demo';
+        $url = site_clean_url((string)($_POST['url'] ?? ''));
+        if ($url === '') {
+            $msg = '';
+            $siteErr = 'Enter a valid website address.';
+        } else {
+            db()->prepare('INSERT INTO sites (business_id, kind, label, url) VALUES (?,?,?,?)')
+               ->execute([$id, $kind, trim($_POST['label'] ?? '') ?: null, $url]);
+            $msg = $kind === 'live' ? 'Live website added.' : 'Demo added.';
+        }
+    } elseif ($a === 'site_kind') {
+        $kind = ($_POST['kind'] ?? '') === 'live' ? 'live' : 'demo';
+        db()->prepare('UPDATE sites SET kind=? WHERE id=? AND business_id=?')->execute([$kind, (int)($_POST['site_id'] ?? 0), $id]);
+        $msg = $kind === 'live' ? 'Marked as live.' : 'Moved back to demo.';
+    } elseif ($a === 'del_site') {
+        db()->prepare('DELETE FROM sites WHERE id=? AND business_id=?')->execute([(int)($_POST['site_id'] ?? 0), $id]);
+        $msg = 'Website removed.';
     } elseif ($a === 'del_contact') {
         db()->prepare('DELETE FROM contacts WHERE id=? AND business_id=?')->execute([(int)($_POST['contact_id'] ?? 0), $id]);
         $msg = 'Contact removed.';
@@ -33,6 +54,8 @@ $contacts = db()->prepare('SELECT * FROM contacts WHERE business_id=? ORDER BY i
 $tps = db()->prepare('SELECT * FROM touchpoints WHERE business_id=? ORDER BY tp_date DESC, id DESC'); $tps->execute([$id]); $tps = $tps->fetchAll();
 $quotes = db()->prepare('SELECT * FROM quotes WHERE business_id=? ORDER BY created_at DESC'); $quotes->execute([$id]); $quotes = $quotes->fetchAll();
 $reqs = db()->prepare('SELECT * FROM requests WHERE business_id=? ORDER BY created_at DESC'); $reqs->execute([$id]); $reqs = $reqs->fetchAll();
+$sites = sites_for($id);
+$demoUrls = demo_suggestions();
 
 $tpBadge = ['Call'=>'quoted','Email'=>'new','Text'=>'sent','Voicemail'=>'contacted','Meeting'=>'won','Other'=>'closed'];
 
@@ -52,6 +75,7 @@ layout_header($b['name'], 'customers.php');
 <?php if (isset($_GET['from']) && $_GET['from']==='request') flash('ok','Business created from the request.'); ?>
 <?php if (isset($_GET['saved'])) flash('ok','Saved.'); ?>
 <?php if ($msg) flash('ok', $msg); ?>
+<?php if ($siteErr) flash('err', $siteErr); ?>
 
 <div class="grid2">
   <div class="card">
@@ -69,6 +93,42 @@ layout_header($b['name'], 'customers.php');
       <div style="margin-top:.5rem;line-height:1.7"><?php foreach ($addr as $ln): ?><div><?= e($ln) ?></div><?php endforeach; ?></div>
     <?php else: ?><div class="muted" style="margin-top:.5rem">No address yet. <a href="customer_edit.php?id=<?= $id ?>">Add one</a>.</div><?php endif; ?>
   </div>
+</div>
+
+<div class="card">
+  <strong>Websites</strong>
+  <?php if ($sites): ?>
+    <table style="margin-top:.5rem">
+      <tbody>
+      <?php foreach ($sites as $s): $live = $s['kind'] === 'live'; ?>
+        <tr>
+          <td style="width:70px"><span class="badge <?= $live ? 'won' : 'quoted' ?>"><?= $live ? 'Live' : 'Demo' ?></span></td>
+          <td>
+            <?php if ($s['label']): ?><strong><?= e($s['label']) ?></strong><br><?php endif; ?>
+            <a href="<?= e($s['url']) ?>" target="_blank" rel="noopener" style="font-size:.85rem;word-break:break-all"><?= e(preg_replace('#^https?://#', '', rtrim($s['url'], '/'))) ?> &#8599;</a>
+          </td>
+          <td style="width:1%;white-space:nowrap">
+            <div class="row-actions">
+              <form method="post" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="site_kind"><input type="hidden" name="site_id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="kind" value="<?= $live ? 'demo' : 'live' ?>"><button class="btn secondary small"><?= $live ? 'Back to demo' : 'Mark live' ?></button></form>
+              <form method="post" onsubmit="return confirm('Remove this website from the customer?')" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="del_site"><input type="hidden" name="site_id" value="<?= (int)$s['id'] ?>"><button class="btn danger small" title="Remove">×</button></form>
+            </div>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php else: ?>
+    <div class="muted" style="margin:.5rem 0 0;font-size:.9rem">No demo or live website linked yet.</div>
+  <?php endif; ?>
+  <form method="post" class="site-add" style="display:grid;grid-template-columns:110px 1fr 1fr auto;gap:.5rem;align-items:center;margin-top:1rem">
+    <?= csrf_field() ?><input type="hidden" name="action" value="add_site">
+    <select name="kind"><option value="demo">Demo</option><option value="live">Live</option></select>
+    <input type="text" name="url" list="demo-urls" placeholder="Website address, e.g. <?= e(client('domain')) ?>" required>
+    <input type="text" name="label" placeholder="Label (optional)">
+    <button class="btn" type="submit">Add</button>
+    <datalist id="demo-urls"><?php foreach ($demoUrls as $u): ?><option value="<?= e($u) ?>"><?php endforeach; ?></datalist>
+  </form>
+  <style>@media(max-width:640px){.site-add{grid-template-columns:1fr !important}}</style>
 </div>
 
 <div class="card">

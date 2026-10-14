@@ -2,10 +2,17 @@
 /** Businesses list + search (the primary customer record). */
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
+require_once __DIR__ . '/_verticals.php';
 require_login();
+require_product('customers', 'quotes');
 
 $q = trim($_GET['q'] ?? '');
-if ($q !== '') {
+$vf = trim($_GET['vertical'] ?? '');
+if ($vf !== '') {
+    $st = db()->prepare("SELECT * FROM businesses WHERE vertical = ? ORDER BY name");
+    $st->execute([$vf]);
+    $rows = $st->fetchAll();
+} elseif ($q !== '') {
     $st = db()->prepare(
         "SELECT DISTINCT b.* FROM businesses b
          LEFT JOIN contacts c ON c.business_id = b.id
@@ -26,6 +33,16 @@ function contact_count(int $bid): int {
     return (int)$st->fetchColumn();
 }
 
+function site_counts(int $bid): array {
+    $out = ['demo' => 0, 'live' => 0];
+    try {
+        $st = db()->prepare('SELECT kind, COUNT(*) n FROM sites WHERE business_id=? GROUP BY kind');
+        $st->execute([$bid]);
+        foreach ($st->fetchAll() as $r) $out[$r['kind']] = (int)$r['n'];
+    } catch (Exception $ex) {}
+    return $out;
+}
+
 layout_header('Customers', 'customers.php');
 ?>
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem">
@@ -40,16 +57,19 @@ layout_header('Customers', 'customers.php');
   <form method="get" style="display:flex;gap:.5rem">
     <input type="text" name="q" placeholder="Search business, contact, city, email, phone…" value="<?= e($q) ?>">
     <button class="btn small">Search</button>
-    <?php if ($q): ?><a href="customers.php" class="btn secondary small">Clear</a><?php endif; ?>
+  </form>
+  <form method="get" style="display:flex;gap:.5rem;margin-top:.5rem">
+    <?= vertical_select('vertical', $vf, 'All industries', 'onchange="this.form.submit()"') ?>
+    <?php if ($q || $vf): ?><a href="customers.php" class="btn secondary small">Clear</a><?php endif; ?>
   </form>
 </div>
 
 <div class="card">
   <?php if (!$rows): ?>
-    <div class="empty"><?= $q ? 'No businesses match &ldquo;' . e($q) . '&rdquo;.' : 'No businesses yet. Add one, or convert a website request.' ?></div>
+    <div class="empty"><?= $q ? 'No businesses match &ldquo;' . e($q) . '&rdquo;.' : ($vf ? 'No ' . e($vf) . ' businesses yet.' : 'No businesses yet. Add one, or convert a website request.') ?></div>
   <?php else: ?>
     <table>
-      <thead><tr><th>Business</th><th>Vertical</th><th>Location</th><th>Contacts</th><th></th></tr></thead>
+      <thead><tr><th>Business</th><th>Vertical</th><th>Location</th><th>Contacts</th><th>Websites</th><th></th></tr></thead>
       <tbody>
       <?php foreach ($rows as $b): ?>
         <tr>
@@ -57,6 +77,7 @@ layout_header('Customers', 'customers.php');
           <td><?= e($b['vertical']) ?></td>
           <td class="muted" style="font-size:.85rem"><?= e(trim(($b['city'] ?? '') . ($b['state'] ? ', ' . $b['state'] : ''), ', ')) ?></td>
           <td><?= contact_count((int)$b['id']) ?></td>
+          <td style="font-size:.8rem"><?php $sc = site_counts((int)$b['id']); ?><?= $sc['live'] ? '<span class="badge won">' . $sc['live'] . ' live</span> ' : '' ?><?= $sc['demo'] ? '<span class="badge quoted">' . $sc['demo'] . ' demo</span>' : '' ?><?= !$sc['live'] && !$sc['demo'] ? '<span class="muted">—</span>' : '' ?></td>
           <td><a href="customer.php?id=<?= (int)$b['id'] ?>" class="btn secondary small">Open</a></td>
         </tr>
       <?php endforeach; ?>

@@ -1,9 +1,11 @@
 <?php
-/** Email a quote PDF to the customer, from quote@modern-ops.net. */
+/** Email a quote PDF to the customer, from the client's quote mailbox (email.quote_from). */
 require_once __DIR__ . '/_auth.php';
+require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_mail.php';
 require_once __DIR__ . '/_quote_pdf.php';
 require_login();
+require_product('quotes');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: quotes.php'); exit; }
 check_csrf();
@@ -27,12 +29,11 @@ $pdf = build_quote_pdf($id);
 if ($pdf === null) { header('Location: quote_view.php?id=' . $id . '&mailerr=1'); exit; }
 
 $greet = $q['first_name'] ?: $q['biz_name'];
-$subject = 'Your quote from Modern Ops (#' . $q['quote_number'] . ')';
-$body = "Hi " . $greet . ",\n\n"
-      . "Thank you for your interest in Modern Ops. Please find your quote attached as a PDF.\n\n"
-      . "If you have any questions or would like to move forward, just reply to this email.\n\n"
-      . "Best regards,\nModern Ops\nquote@modern-ops.net\nmodern-ops.net";
-$name = 'Modern-Ops-Quote-' . preg_replace('/[^A-Za-z0-9_-]/', '', (string)$q['quote_number']) . '.pdf';
+// Wording comes from the client file; {name} and {number} are filled in here.
+$fill = ['{name}' => $greet, '{number}' => $q['quote_number']];
+$subject = strtr((string) client('quotes.email_subject', 'Your quote (#{number})'), $fill);
+$body = strtr((string) client('quotes.email_body', "Hi {name},\n\nYour quote is attached as a PDF."), $fill);
+$name = quote_file_name($q['quote_number']);
 
 $ok = send_mail_pdf($toEmail, $subject, $body, $pdf, $name, QUOTE_MAIL_FROM, QUOTE_SMTP_USER, QUOTE_MAIL_FROM, QUOTE_MAIL_FROM_NAME);
 if ($ok) {

@@ -2,7 +2,9 @@
 /** Add or edit a business. */
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
+require_once __DIR__ . '/_verticals.php';
 require_login();
+require_product('customers', 'quotes');
 
 $id = (int)($_GET['id'] ?? 0);
 $b = ['id'=>0,'name'=>'','vertical'=>'','main_phone'=>'','main_email'=>'','address'=>'','address2'=>'','city'=>'','state'=>'','country'=>'United States','zip'=>'','notes'=>''];
@@ -48,7 +50,7 @@ layout_header($id ? 'Edit business' : 'New business', 'customers.php');
     <?= csrf_field() ?>
     <div class="grid2">
       <div><label>Business name *</label><input type="text" name="name" required value="<?= e($b['name']) ?>"></div>
-      <div><label>Vertical / industry</label><input type="text" name="vertical" value="<?= e($b['vertical']) ?>" placeholder="e.g. Restaurant, Contractor"></div>
+      <div><label>Vertical / industry</label><?= vertical_select('vertical', (string)$b['vertical']) ?></div>
     </div>
     <div class="grid2">
       <div><label>Main number</label><input type="text" name="main_phone" value="<?= e($b['main_phone']) ?>"></div>

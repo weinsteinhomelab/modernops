@@ -3,6 +3,7 @@
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
 require_login();
+require_product('quotes');
 
 $rows = db()->query(
     "SELECT q.*, b.name AS customer_name

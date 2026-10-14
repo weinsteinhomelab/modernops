@@ -2,21 +2,11 @@
 /** Idempotent schema migrations so a live database upgrades itself safely. */
 require_once __DIR__ . '/_db.php';
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 6;
 
-/** The standard Modern Ops service catalog (from the quote template). */
+/** Starting pricebook for an empty Catalog: the "catalog" list in the client file. */
 function catalog_defaults(): array {
-    return [
-        ['Website Design & Setup', 'Custom website, hosting configuration, domain setup, SSL', 350.00, 'one_time'],
-        ['Business Email Setup', 'Professional email address at your domain', 0.00, 'one_time'],
-        ['Domain Registration', 'Annual: 1-year domain registration', 15.00, 'one_time'],
-        ['Hosting', 'Annual: managed website hosting', 60.00, 'one_time'],
-        ['Google Business Profile Setup', 'Create and optimize your Google Business listing', 0.00, 'one_time'],
-        ['Social Media Profile Setup', 'Create and brand your social media pages', 0.00, 'one_time'],
-        ['Additional Email Account Setup', 'Extra email addresses at your domain', 0.00, 'one_time'],
-        ['Site Maintenance', 'Security patches, uptime monitoring, backups', 70.00, 'monthly'],
-        ['Site Maintenance & Content Updates', 'Everything in maintenance plus text and photo updates', 120.00, 'monthly'],
-    ];
+    return (array) client('catalog', []);
 }
 
 function seed_catalog(): void {
@@ -29,9 +19,9 @@ function seed_catalog(): void {
 }
 
 function seed_defaults(): void {
-    if (setting('next_quote_number') === null) set_setting('next_quote_number', '1001');
-    if (setting('default_tax_rate') === null)  set_setting('default_tax_rate', '0');
-    if (setting('default_tax_label') === null) set_setting('default_tax_label', 'Sales Tax');
+    if (setting('next_quote_number') === null) set_setting('next_quote_number', (string) client('quotes.first_number', '1001'));
+    if (setting('default_tax_rate') === null)  set_setting('default_tax_rate', (string) client('quotes.tax_rate', '0'));
+    if (setting('default_tax_label') === null) set_setting('default_tax_label', (string) client('quotes.tax_label', 'Sales Tax'));
 }
 
 function run_phase2_migration(): void {
@@ -117,12 +107,49 @@ function run_phase3_migration(): void {
     } catch (Exception $ex) {}
 }
 
+/** Phase 4: demo + live websites tied to a business. */
+function run_phase4_migration(): void {
+    try {
+        db()->exec("CREATE TABLE IF NOT EXISTS sites (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            business_id INT NOT NULL,
+            kind ENUM('demo','live') NOT NULL DEFAULT 'demo',
+            label VARCHAR(190) DEFAULT NULL,
+            url VARCHAR(500) NOT NULL,
+            notes TEXT DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX (business_id)
+         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (Exception $ex) {}
+}
+
+/** Phase 5: quarterly, semi-annual and annual billing periods; internal cost + margin per quote line. */
+function run_phase5_migration(): void {
+    $enum = "ENUM('one_time','monthly','quarterly','semiannual','annual') NOT NULL DEFAULT 'one_time'";
+    foreach (['catalog_items', 'quote_items'] as $t) {
+        try { db()->exec("ALTER TABLE $t MODIFY billing $enum"); } catch (Exception $ex) {}
+    }
+    foreach (["ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS unit_cost DECIMAL(10,2) DEFAULT NULL AFTER unit_price",
+              "ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS margin DECIMAL(8,2) DEFAULT NULL AFTER unit_cost"] as $sql) {
+        try { db()->exec($sql); } catch (Exception $ex) {}
+    }
+}
+
+/** Phase 6: section headings among quote lines (title only; billing marks the one-time or recurring area). */
+function run_phase6_migration(): void {
+    try { db()->exec("ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS is_section TINYINT NOT NULL DEFAULT 0 AFTER billing"); } catch (Exception $ex) {}
+}
+
 function maybe_migrate(): void {
     try {
         $v = (int) (setting('schema_version', '1'));
         if ($v >= SCHEMA_VERSION) return;
         if ($v < 2) run_phase2_migration();
         if ($v < 3) run_phase3_migration();
+        if ($v < 4) run_phase4_migration();
+        if ($v < 5) run_phase5_migration();
+        if ($v < 6) run_phase6_migration();
         set_setting('schema_version', (string) SCHEMA_VERSION);
     } catch (Exception $ex) {}
 }

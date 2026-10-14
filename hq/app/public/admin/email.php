@@ -1,15 +1,16 @@
 <?php
-/** Email tab — read and send across the Modern Ops mailboxes. */
+/** Ops Inbox — read and send across the client's mailboxes (email.accounts in the client file). */
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_imap.php';
 require_once __DIR__ . '/_mail.php';
 require_login();
+require_product('inbox');
 
 if (!imap_ready()) {
-    layout_header('Email', 'email.php');
-    echo '<h1 class="page">Email</h1>';
-    echo '<div class="card"><strong>Email isn\'t ready yet.</strong><p class="muted" style="margin-top:.5rem">This needs the IMAP library and your mailbox password. Rebuild the app (<code>docker compose up -d --build</code>) and make sure <code>SMTP_PASS</code> is set in <code>.env</code>.</p></div>';
+    layout_header('Inbox', 'email.php');
+    echo '<h1 class="page">Inbox</h1>';
+    echo '<div class="card"><strong>Inbox isn\'t ready yet.</strong><p class="muted" style="margin-top:.5rem">This needs the IMAP library and your mailbox password. Rebuild the app (<code>docker compose up -d --build</code>) and make sure <code>SMTP_PASS</code> is set in <code>.env</code>.</p></div>';
     layout_footer();
     exit;
 }
@@ -30,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $subject = trim($_POST['subject'] ?? '');
         $body = (string)($_POST['body'] ?? '');
         if ($to === '') { header('Location: email.php?acct=' . $ai . '&senderr=1'); exit; }
-        $ok = send_plain($to, $subject, $body, $from, $from, 'Modern Ops');
+        $ok = send_plain($to, $subject, $body, $from, $from, (string) client('name'));
         header('Location: email.php?acct=' . $ai . ($ok ? '&sent=1' : '&senderr=1'));
         exit;
     } elseif ($a === 'delete') {
@@ -69,14 +70,14 @@ $list = [];
 if ($view === 'list') {
     try { $list = imap_list($account, 30); }
     catch (\Throwable $e) {
-        $err = 'Could not connect to ' . $account . '. If this mailbox has a different password than info@, that\'s likely why.';
+        $err = 'Could not connect to ' . $account . '. Every mailbox here has to use the same password (SMTP_PASS); if this one is different, that\'s likely why.';
     }
 }
 
-layout_header('Email', 'email.php');
+layout_header('Inbox', 'email.php');
 ?>
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem">
-  <h1 class="page">Email</h1>
+  <h1 class="page">Inbox</h1>
   <a href="email.php?acct=<?= $ai ?>&compose=1" class="btn">✎ Compose</a>
 </div>
 <?php
@@ -117,7 +118,29 @@ if ($err) flash('err', $err);
         <a href="email.php?acct=<?= $ai ?>&reply=<?= (int)$msg['uid'] ?>" class="btn secondary small">Reply</a>
         <form method="post" onsubmit="return confirm('Delete this message?')" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="uid" value="<?= (int)$msg['uid'] ?>"><button class="btn danger small">Delete</button></form>
       </div>
-      <div style="margin-top:.8rem;line-height:1.6;white-space:pre-wrap;font-size:.92rem"><?= e($msg['body']) ?></div>
+      <?php if ($msg['html'] !== ''):
+        $showImg = !empty($_GET['img']);
+        $remote = preg_match('#<img\b[^>]*\ssrc\s*=\s*["\']?https?://#i', $msg['html']);
+        $frameSrc = 'email_body.php?acct=' . $ai . '&uid=' . (int)$msg['uid'] . ($showImg ? '&img=1' : ''); ?>
+        <?php if ($remote && !$showImg): ?>
+          <div class="muted" style="font-size:.82rem;margin:.2rem 0 .6rem;padding:.5rem .7rem;border:1px dashed var(--border);border-radius:7px">
+            Pictures from the internet are hidden (they can tell the sender you opened it).
+            <a href="email.php?acct=<?= $ai ?>&uid=<?= (int)$msg['uid'] ?>&img=1">Show pictures</a>
+          </div>
+        <?php endif; ?>
+        <iframe id="mailframe" src="<?= e($frameSrc) ?>" title="Message" sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+                style="width:100%;min-height:320px;border:1px solid var(--border);border-radius:8px;background:#fff;display:block"></iframe>
+        <script>
+          (function(){
+            var f = document.getElementById('mailframe');
+            function fit(){ try { var d = f.contentDocument; if (d && d.documentElement) f.style.height = (d.documentElement.scrollHeight + 4) + 'px'; } catch(e){} }
+            f.addEventListener('load', function(){ fit(); setTimeout(fit, 400); setTimeout(fit, 1500); });
+            window.addEventListener('resize', fit);
+          })();
+        </script>
+      <?php else: ?>
+        <div style="margin-top:.8rem;line-height:1.6;white-space:pre-wrap;font-size:.92rem;overflow-wrap:anywhere"><?= e($msg['body']) ?></div>
+      <?php endif; ?>
 
     <?php else: ?>
       <?php if (!$list): ?>
