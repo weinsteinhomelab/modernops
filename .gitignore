@@ -2,3 +2,4 @@
 hq/.env
 hq/backup/*.sql
 hq/backup/*.log
+hq/docker-compose.override.yml

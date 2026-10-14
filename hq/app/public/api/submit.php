@@ -6,8 +6,17 @@
 require_once __DIR__ . '/../admin/_db.php';
 require_once __DIR__ . '/../admin/_mail.php';
 
-// --- CORS (allow the public website to post here) ---
-header('Access-Control-Allow-Origin: ' . SITE_ORIGIN);
+// --- CORS (allow the public website — apex and www — to post here) ---
+$allowed = [SITE_ORIGIN];
+if (preg_match('#^https?://#', SITE_ORIGIN)) {
+    $allowed[] = (strpos(SITE_ORIGIN, '://www.') !== false)
+        ? str_replace('://www.', '://', SITE_ORIGIN)   // add apex
+        : str_replace('://', '://www.', SITE_ORIGIN);  // add www
+}
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array($origin, $allowed, true)) {
+    header('Access-Control-Allow-Origin: ' . $origin);
+}
 header('Vary: Origin');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');

@@ -591,36 +591,65 @@
         <input type="email" name="email" placeholder="Email address">
         <input type="tel" name="phone" placeholder="Phone number (optional)">
         <textarea name="message" placeholder="Tell us about your business and what you need..."></textarea>
+        <input type="hidden" name="type" value="quote">
+        <input type="text" name="company_website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
         <button type="submit" id="submitBtn">Send message →</button>
         <div id="formSuccess" style="display:none; background:#e8f4ee; border-radius:8px; padding:1rem 1.25rem; color:#1a6b4a; font-weight:600; font-size:0.9rem;">Thanks for reaching out! We will be in touch within 24 hours.</div>
       </form>
       <script>
-        document.getElementById("contactForm").addEventListener("submit", function(e) {
-          e.preventDefault();
+        (function () {
+          var form = document.getElementById("contactForm");
           var btn = document.getElementById("submitBtn");
-          btn.textContent = "Sending...";
-          btn.disabled = true;
-          var data = new FormData(this);
-          fetch("https://formspree.io/f/xojbgvob", {
-            method: "POST",
-            body: data,
-            headers: { "Accept": "application/json" }
-          }).then(function(res) {
-            if (res.ok) {
-              document.getElementById("formSuccess").style.display = "block";
-              document.getElementById("contactForm").reset();
-              btn.style.display = "none";
-            } else {
-              btn.textContent = "Send message →";
-              btn.disabled = false;
-              alert("Something went wrong. Please try again.");
-            }
-          }).catch(function() {
+
+          // Primary: Modern Ops HQ (your private CRM). Fallback: Formspree,
+          // so a lead is never lost if the home server is briefly offline.
+          var HQ_ENDPOINT = "https://hq.kobylab.dev/api/submit.php";
+          var FORMSPREE_ENDPOINT = "https://formspree.io/f/xojbgvob";
+
+          function showSuccess() {
+            document.getElementById("formSuccess").style.display = "block";
+            form.reset();
+            btn.style.display = "none";
+          }
+          function showError() {
             btn.textContent = "Send message →";
             btn.disabled = false;
-            alert("Something went wrong. Please try again.");
+            alert("Something went wrong. Please try again, or email info@modern-ops.net.");
+          }
+
+          form.addEventListener("submit", function (e) {
+            e.preventDefault();
+            btn.textContent = "Sending...";
+            btn.disabled = true;
+
+            var fd = new FormData(form);
+            var payload = {};
+            fd.forEach(function (v, k) { payload[k] = v; });
+
+            fetch(HQ_ENDPOINT, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            })
+              .then(function (res) {
+                if (!res.ok) throw new Error("hq");
+                return res.json();
+              })
+              .then(function (j) {
+                if (j && j.ok) { showSuccess(); } else { throw new Error("hq"); }
+              })
+              .catch(function () {
+                // Fallback to Formspree
+                fetch(FORMSPREE_ENDPOINT, {
+                  method: "POST",
+                  body: fd,
+                  headers: { "Accept": "application/json" }
+                })
+                  .then(function (res) { res.ok ? showSuccess() : showError(); })
+                  .catch(showError);
+              });
           });
-        });
+        })();
       </script>
     </div>
   </div>

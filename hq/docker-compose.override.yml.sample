@@ -1,0 +1,11 @@
+# Local-only overrides — copy to docker-compose.override.yml (gitignored).
+# Docker Compose merges this automatically, so you can enable the Cloudflare
+# Tunnel here instead of editing docker-compose.yml (which would conflict on
+# future `git pull`s).
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    depends_on:
+      - app
