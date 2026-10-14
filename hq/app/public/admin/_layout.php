@@ -45,7 +45,7 @@ function layout_header(string $title, string $active = ''): void {
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.55}
   a{color:var(--accent);text-decoration:none}
   a:hover{text-decoration:underline}
-  header.topbar{background:var(--topbar);color:var(--topbar-text);padding:0 5%;display:flex;align-items:center;justify-content:space-between;min-height:56px;position:sticky;top:0;z-index:50;flex-wrap:wrap;gap:.5rem}
+  header.topbar{background:var(--topbar);color:var(--topbar-text);padding:0 2.5rem;display:flex;align-items:center;justify-content:space-between;min-height:56px;position:sticky;top:0;z-index:50;flex-wrap:wrap;gap:.5rem}
   .brand{font-family:Georgia,serif;font-weight:700;font-size:1.05rem;color:var(--topbar-text);text-decoration:none}
   .brand b{color:<?= brand_color('highlight', '#5fcfa0') ?>}
   .brand img{max-height:32px;display:block}
@@ -55,7 +55,10 @@ function layout_header(string $title, string $active = ''): void {
   nav.main a.active{background:var(--accent);color:var(--accent-text)}
   .topbar-right{display:flex;align-items:center;gap:1rem;font-size:.85rem;color:var(--topbar-dim)}
   .themebtn{background:transparent;border:1px solid rgba(255,255,255,.2);color:var(--topbar-text);width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center}
-  .wrap{max-width:1000px;margin:0 auto;padding:1.75rem 5% 4rem}
+  .wrap{padding:1.75rem 2.5rem 4rem}
+  .grid-auto{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0 1rem}
+  .grid-auto .span-all{grid-column:1/-1}
+  .grid-auto .span-2{grid-column:span 2}
   h1.page{font-family:Georgia,serif;font-size:1.5rem;font-weight:700;margin-bottom:.25rem}
   .sub{color:var(--muted);margin-bottom:1.5rem;font-size:.9rem}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.4rem;margin-bottom:1.25rem}
@@ -92,7 +95,7 @@ function layout_header(string $title, string $active = ''): void {
   .flash.err{background:rgba(176,36,36,.12);color:#c0392b;border:1px solid rgba(176,36,36,.3)}
   .muted{color:var(--muted)}
   .empty{text-align:center;color:var(--muted);padding:2.5rem 1rem}
-  @media(max-width:640px){.grid2{grid-template-columns:1fr}nav.main a{padding:.45rem .55rem;font-size:.82rem}.topbar-right .uname{display:none}.wrap{padding-top:1.25rem}}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}nav.main a{padding:.45rem .55rem;font-size:.82rem}.topbar-right .uname{display:none}.wrap{padding:1.25rem 1rem 3rem}.grid-auto .span-2{grid-column:1/-1}header.topbar{padding:0 1rem}}
 </style>
 </head>
 <body>

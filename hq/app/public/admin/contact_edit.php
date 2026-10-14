@@ -44,16 +44,13 @@ layout_header($id ? 'Edit contact' : 'New contact', 'customers.php');
 <h1 class="page"><?= $id ? 'Edit contact' : 'New contact' ?></h1>
 <p class="sub">At <?= e($biz['name']) ?></p>
 <?php if ($err) flash('err', $err); ?>
-<div class="card" style="max-width:620px">
+<div class="card">
   <form method="post">
     <?= csrf_field() ?>
-    <div class="grid2">
+    <div class="grid-auto">
       <div><label>First name</label><input type="text" name="first_name" value="<?= e($c['first_name']) ?>"></div>
       <div><label>Last name</label><input type="text" name="last_name" value="<?= e($c['last_name']) ?>"></div>
-    </div>
-    <label>Title</label>
-    <input type="text" name="title" value="<?= e($c['title']) ?>" placeholder="e.g. Owner, Office Manager">
-    <div class="grid2">
+      <div><label>Title</label><input type="text" name="title" value="<?= e($c['title']) ?>" placeholder="e.g. Owner, Office Manager"></div>
       <div><label>Email</label><input type="email" name="email" value="<?= e($c['email']) ?>"></div>
       <div><label>Phone</label><input type="text" name="phone" value="<?= e($c['phone']) ?>"></div>
     </div>

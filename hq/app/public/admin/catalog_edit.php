@@ -30,14 +30,12 @@ layout_header('Edit item', 'catalog.php');
 <p style="margin-bottom:.5rem"><a href="catalog.php">&larr; Catalog</a></p>
 <h1 class="page">Edit saved item</h1>
 <p class="sub">&nbsp;</p>
-<div class="card" style="max-width:620px">
+<div class="card">
   <form method="post">
     <?= csrf_field() ?>
-    <label>Title</label>
-    <input type="text" name="title" required value="<?= e($c['title']) ?>">
-    <label>Description</label>
-    <input type="text" name="description" value="<?= e($c['description']) ?>">
-    <div class="grid2">
+    <div class="grid-auto">
+      <div><label>Title</label><input type="text" name="title" required value="<?= e($c['title']) ?>"></div>
+      <div class="span-2"><label>Description</label><input type="text" name="description" value="<?= e($c['description']) ?>"></div>
       <div><label>Unit price ($)</label><input type="number" step="0.01" min="0" name="unit_price" value="<?= e($c['unit_price']) ?>"></div>
       <div><label>Billing</label><select name="billing"><?= billing_options((string)$c['billing']) ?></select></div>
     </div>

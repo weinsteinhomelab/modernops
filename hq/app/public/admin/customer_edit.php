@@ -45,31 +45,22 @@ layout_header($id ? 'Edit business' : 'New business', 'customers.php');
 <h1 class="page"><?= $id ? 'Edit business' : 'New business' ?></h1>
 <p class="sub">&nbsp;</p>
 <?php if ($err) flash('err', $err); ?>
-<div class="card" style="max-width:680px">
+<div class="card">
   <form method="post">
     <?= csrf_field() ?>
-    <div class="grid2">
+    <div class="grid-auto">
       <div><label>Business name *</label><input type="text" name="name" required value="<?= e($b['name']) ?>"></div>
       <div><label>Vertical / industry</label><?= vertical_select('vertical', (string)$b['vertical']) ?></div>
-    </div>
-    <div class="grid2">
       <div><label>Main number</label><input type="text" name="main_phone" value="<?= e($b['main_phone']) ?>"></div>
       <div><label>Main email</label><input type="email" name="main_email" value="<?= e($b['main_email']) ?>"></div>
-    </div>
-    <label>Address</label>
-    <input type="text" name="address" value="<?= e($b['address']) ?>">
-    <label>Address 2</label>
-    <input type="text" name="address2" value="<?= e($b['address2']) ?>" placeholder="Suite, unit, floor (optional)">
-    <div class="grid2">
+      <div><label>Address</label><input type="text" name="address" value="<?= e($b['address']) ?>"></div>
+      <div><label>Address 2</label><input type="text" name="address2" value="<?= e($b['address2']) ?>" placeholder="Suite, unit, floor (optional)"></div>
       <div><label>City</label><input type="text" name="city" value="<?= e($b['city']) ?>"></div>
       <div><label>State</label><input type="text" name="state" value="<?= e($b['state']) ?>"></div>
-    </div>
-    <div class="grid2">
       <div><label>Zip code</label><input type="text" name="zip" value="<?= e($b['zip']) ?>"></div>
       <div><label>Country</label><input type="text" name="country" value="<?= e($b['country']) ?>"></div>
+      <div class="span-all"><label>Notes</label><textarea name="notes" rows="4"><?= e($b['notes']) ?></textarea></div>
     </div>
-    <label>Notes</label>
-    <textarea name="notes" rows="4"><?= e($b['notes']) ?></textarea>
     <div class="row-actions" style="margin-top:1.25rem">
       <button class="btn" type="submit"><?= $id ? 'Save changes' : 'Create business' ?></button>
       <a href="<?= $id ? 'customer.php?id='.$id : 'customers.php' ?>" class="btn secondary">Cancel</a>
