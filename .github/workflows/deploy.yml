@@ -66,7 +66,7 @@ jobs:
           # Deploy via the agent (no -i needed; the agent holds the key)
           rsync -avz \
             -e "ssh -p $SSH_PORT" \
-            --exclude='.git*' --exclude='.github' --exclude='hq' \
+            --exclude='.git*' --exclude='.github' --exclude='hq' --exclude='*.md' \
             ./ "$SSH_USER@$SSH_HOST:~/www/modern-ops.net/public_html/"
 
           ssh-agent -k >/dev/null 2>&1 || true
