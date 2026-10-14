@@ -5,7 +5,13 @@ require_once __DIR__ . '/_layout.php';
 require_login();
 
 $id = (int)($_GET['id'] ?? 0);
-$st = db()->prepare('SELECT q.*, c.name AS c_name, c.business AS c_business, c.email AS c_email FROM quotes q JOIN customers c ON c.id=q.customer_id WHERE q.id=?');
+$st = db()->prepare(
+    'SELECT q.*, b.name AS biz_name, b.main_email AS biz_email,
+            ct.first_name, ct.last_name, ct.email AS contact_email
+     FROM quotes q
+     JOIN businesses b ON b.id = q.business_id
+     LEFT JOIN contacts ct ON ct.id = q.contact_id
+     WHERE q.id = ?');
 $st->execute([$id]);
 $q = $st->fetch();
 if (!$q) { http_response_code(404); layout_header('Not found','quotes.php'); echo '<div class="card">Quote not found.</div>'; layout_footer(); exit; }
@@ -39,19 +45,23 @@ $taxRate = (float)$q['tax_rate'];
 $tax = $oneSub * $taxRate / 100;
 $oneTotal = $oneSub + $tax;
 
+$preparedFor = trim(($q['first_name'] ?? '') . ' ' . ($q['last_name'] ?? ''));
+$bizName = $q['biz_name'];
+$toEmail = $q['contact_email'] ?: $q['biz_email'];
+
 layout_header('Quote ' . $q['quote_number'], 'quotes.php');
 ?>
 <p style="margin-bottom:.5rem"><a href="quotes.php">&larr; Quotes</a></p>
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem">
   <div>
     <h1 class="page">Quote <?= e($q['quote_number']) ?> · <span class="badge <?= e($q['status']) ?>"><?= e($q['status']) ?></span></h1>
-    <p class="sub">For <?= e($q['c_name']) ?><?= $q['c_business'] ? ' · ' . e($q['c_business']) : '' ?></p>
+    <p class="sub">For <?= e($bizName) ?><?= $preparedFor ? ' · ' . e($preparedFor) : '' ?></p>
   </div>
   <div class="row-actions">
     <a href="quote_edit.php?id=<?= $id ?>" class="btn secondary">Edit</a>
     <a href="quote_pdf.php?id=<?= $id ?>" class="btn secondary" target="_blank">Download PDF</a>
-    <?php if ($q['c_email']): ?>
-      <form method="post" action="quote_send.php" onsubmit="return confirm('Email this quote to <?= e($q['c_email']) ?>?')" style="display:inline">
+    <?php if ($toEmail): ?>
+      <form method="post" action="quote_send.php" onsubmit="return confirm('Email this quote to <?= e($toEmail) ?>?')" style="display:inline">
         <?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>">
         <button class="btn">Email to customer</button>
       </form>
@@ -71,7 +81,7 @@ layout_header('Quote ' . $q['quote_number'], 'quotes.php');
       <?php foreach (['draft','sent','accepted','declined'] as $s): ?><option value="<?= $s ?>"<?= $q['status']===$s?' selected':'' ?>><?= ucfirst($s) ?></option><?php endforeach; ?>
     </select>
   </form>
-  <?php if ($q['c_email']): ?><span class="muted" style="font-size:.85rem">· Customer email: <?= e($q['c_email']) ?></span><?php else: ?><span class="muted" style="font-size:.85rem">· No customer email on file — <a href="customer_edit.php?id=<?= (int)$q['customer_id'] ?>">add one</a> to enable emailing.</span><?php endif; ?>
+  <?php if ($toEmail): ?><span class="muted" style="font-size:.85rem">· Emails to: <?= e($toEmail) ?></span><?php else: ?><span class="muted" style="font-size:.85rem">· No email on file — add a contact email or the business main email to enable emailing.</span><?php endif; ?>
   <form method="post" onsubmit="return confirm('Delete this quote permanently?')" style="margin-left:auto">
     <?= csrf_field() ?><input type="hidden" name="action" value="delete"><button class="btn danger small">Delete quote</button>
   </form>
@@ -83,11 +93,16 @@ layout_header('Quote ' . $q['quote_number'], 'quotes.php');
   <div style="color:#555;font-size:.72rem;margin:.25rem 0 1.1rem;border-bottom:2px solid #0F3D2A;padding-bottom:.8rem">Web &amp; business operations for small businesses &nbsp;|&nbsp; modern-ops.net &nbsp;|&nbsp; Delaware Valley, PA</div>
   <div style="color:#0F3D2A;font-size:1.1rem;letter-spacing:.04em;margin:.3rem 0 1rem;font-weight:700">QUOTE</div>
   <div style="font-size:.82rem;line-height:1.9;margin-bottom:1rem">
-    <div><b style="color:#0F3D2A;display:inline-block;width:110px">Prepared for:</b> <?= e($q['c_name']) ?></div>
-    <div><b style="color:#0F3D2A;display:inline-block;width:110px">Business:</b> <?= e($q['c_business']) ?></div>
+    <?php if ($preparedFor): ?><div><b style="color:#0F3D2A;display:inline-block;width:110px">Prepared for:</b> <?= e($preparedFor) ?></div><?php endif; ?>
+    <div><b style="color:#0F3D2A;display:inline-block;width:110px">Business:</b> <?= e($bizName) ?></div>
     <div><b style="color:#0F3D2A;display:inline-block;width:110px">Quote date:</b> <?= e(date('M j, Y', strtotime($q['issue_date']))) ?></div>
     <div><b style="color:#0F3D2A;display:inline-block;width:110px">Quote #:</b> <?= e($q['quote_number']) ?></div>
   </div>
+
+  <?php if (trim((string)$q['scope_of_work']) !== ''): ?>
+    <div style="background:#E6F4EC;color:#0F3D2A;font-weight:700;font-size:.72rem;letter-spacing:.05em;padding:.4rem .6rem">SCOPE OF WORK</div>
+    <div style="font-size:.8rem;color:#333;padding:.6rem .2rem;white-space:pre-wrap"><?= e($q['scope_of_work']) ?></div>
+  <?php endif; ?>
 
   <?php if ($one): ?>
     <div style="background:#E6F4EC;color:#0F3D2A;font-weight:700;font-size:.72rem;letter-spacing:.05em;padding:.4rem .6rem;margin-top:.8rem">ONE-TIME SERVICES</div>

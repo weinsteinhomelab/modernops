@@ -26,10 +26,17 @@ function quote_terms(): array {
 }
 
 function build_quote_pdf(int $id): ?string {
-    $st = db()->prepare('SELECT q.*, c.name AS c_name, c.business AS c_business FROM quotes q JOIN customers c ON c.id=q.customer_id WHERE q.id=?');
+    $st = db()->prepare(
+        'SELECT q.*, b.name AS biz_name, ct.first_name, ct.last_name
+         FROM quotes q
+         JOIN businesses b ON b.id = q.business_id
+         LEFT JOIN contacts ct ON ct.id = q.contact_id
+         WHERE q.id = ?');
     $st->execute([$id]);
     $q = $st->fetch();
     if (!$q) return null;
+    $q['c_business'] = $q['biz_name'];
+    $q['c_name'] = trim(($q['first_name'] ?? '') . ' ' . ($q['last_name'] ?? ''));
     $it = db()->prepare('SELECT * FROM quote_items WHERE quote_id=? ORDER BY sort_order, id');
     $it->execute([$id]);
     $items = $it->fetchAll();
@@ -67,7 +74,7 @@ function render_quote_pdf(array $q, array $items): string {
         $pdf->SetFont('Arial', 'B', 9); $pdf->SetTextColor(...$GREEN); $pdf->Cell(28, 6, tx($label), 0, 0);
         $pdf->SetFont('Arial', '', 9); $pdf->SetTextColor(26, 26, 26); $pdf->Cell(0, 6, tx($val), 0, 1);
     };
-    $field('Prepared for:', $q['c_name']);
+    if (trim((string)$q['c_name']) !== '') $field('Prepared for:', $q['c_name']);
     if ($q['c_business']) $field('Business:', $q['c_business']);
     $field('Quote date:', date('M j, Y', strtotime($q['issue_date'])));
     if ($q['valid_until']) $field('Valid until:', date('M j, Y', strtotime($q['valid_until'])));
@@ -78,6 +85,14 @@ function render_quote_pdf(array $q, array $items): string {
         $pdf->SetFillColor(...$BAND); $pdf->SetTextColor(...$GREEN); $pdf->SetFont('Arial', 'B', 8);
         $pdf->Cell(0, 6, tx('  ' . $label), 0, 1, 'L', true); $pdf->Ln(1);
     };
+
+    // Scope of work
+    if (trim((string)($q['scope_of_work'] ?? '')) !== '') {
+        $band('SCOPE OF WORK');
+        $pdf->SetFont('Arial', '', 9); $pdf->SetTextColor(51, 51, 51);
+        $pdf->MultiCell(0, 4.6, tx($q['scope_of_work']), 0, 'L');
+        $pdf->Ln(3);
+    }
     $renderRows = function ($rows, $suffix) use ($pdf, $descW, $priceW, $LINE, $GREY, $m) {
         foreach ($rows as $r) {
             $lt = (float)$r['quantity'] * (float)$r['unit_price'];

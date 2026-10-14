@@ -10,9 +10,12 @@ function mime_header(string $s): string {
     return preg_match('/[^\x20-\x7E]/', $s) ? '=?UTF-8?B?' . base64_encode($s) . '?=' : $s;
 }
 
-/** Deliver a fully-formed message (headers + blank line + body) to one recipient. */
-function smtp_deliver(string $to, string $message): bool {
+/** Deliver a fully-formed message (headers + blank line + body) to one recipient.
+ *  $authUser / $mailFrom override the default mailbox (same shared password). */
+function smtp_deliver(string $to, string $message, ?string $authUser = null, ?string $mailFrom = null): bool {
     if (SMTP_PASS === '') return false;
+    $authUser = $authUser ?: SMTP_USER;
+    $mailFrom = $mailFrom ?: MAIL_FROM;
     $transport = (SMTP_SECURE === 'ssl') ? 'ssl://' . SMTP_HOST . ':' . SMTP_PORT : 'tcp://' . SMTP_HOST . ':' . SMTP_PORT;
     $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
     $fp = @stream_socket_client($transport, $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $ctx);
@@ -36,9 +39,9 @@ function smtp_deliver(string $to, string $message): bool {
             $cmd('EHLO modern-ops.net');
         }
         if ($code($cmd('AUTH LOGIN')) !== 334) { fclose($fp); return false; }
-        if ($code($cmd(base64_encode(SMTP_USER))) !== 334) { fclose($fp); return false; }
+        if ($code($cmd(base64_encode($authUser))) !== 334) { fclose($fp); return false; }
         if ($code($cmd(base64_encode(SMTP_PASS))) !== 235) { fclose($fp); return false; }
-        if ($code($cmd('MAIL FROM:<' . MAIL_FROM . '>')) !== 250) { fclose($fp); return false; }
+        if ($code($cmd('MAIL FROM:<' . $mailFrom . '>')) !== 250) { fclose($fp); return false; }
         $r = $code($cmd('RCPT TO:<' . $to . '>')); if ($r !== 250 && $r !== 251) { fclose($fp); return false; }
         if ($code($cmd('DATA')) !== 354) { fclose($fp); return false; }
 
@@ -50,8 +53,10 @@ function smtp_deliver(string $to, string $message): bool {
     } catch (Throwable $ex) { @fclose($fp); return false; }
 }
 
-function base_headers(string $to, string $subject, string $replyTo): string {
-    $h  = 'From: ' . mime_header(MAIL_FROM_NAME) . ' <' . MAIL_FROM . ">\r\n";
+function base_headers(string $to, string $subject, string $replyTo, ?string $fromAddr = null, ?string $fromName = null): string {
+    $fromAddr = $fromAddr ?: MAIL_FROM;
+    $fromName = $fromName ?: MAIL_FROM_NAME;
+    $h  = 'From: ' . mime_header($fromName) . ' <' . $fromAddr . ">\r\n";
     $h .= 'To: <' . $to . ">\r\n";
     if ($replyTo !== '') $h .= 'Reply-To: <' . $replyTo . ">\r\n";
     $h .= 'Subject: ' . mime_header($subject) . "\r\n";
@@ -68,10 +73,10 @@ function send_mail(string $to, string $subject, string $body, string $replyTo = 
     return smtp_deliver($to, $msg);
 }
 
-/** Email with a PDF attachment. */
-function send_mail_pdf(string $to, string $subject, string $body, string $pdfBytes, string $pdfName, string $replyTo = ''): bool {
+/** Email with a PDF attachment, optionally from a specific mailbox. */
+function send_mail_pdf(string $to, string $subject, string $body, string $pdfBytes, string $pdfName, string $replyTo = '', ?string $fromUser = null, ?string $fromAddr = null, ?string $fromName = null): bool {
     $boundary = 'MOHQ-' . bin2hex(random_bytes(10));
-    $msg  = base_headers($to, $subject, $replyTo);
+    $msg  = base_headers($to, $subject, $replyTo, $fromAddr, $fromName);
     $msg .= 'Content-Type: multipart/mixed; boundary="' . $boundary . "\"\r\n\r\n";
     $msg .= '--' . $boundary . "\r\n";
     $msg .= "Content-Type: text/plain; charset=UTF-8\r\n\r\n" . $body . "\r\n";
@@ -81,5 +86,5 @@ function send_mail_pdf(string $to, string $subject, string $body, string $pdfByt
     $msg .= 'Content-Disposition: attachment; filename="' . $pdfName . "\"\r\n\r\n";
     $msg .= chunk_split(base64_encode($pdfBytes)) . "\r\n";
     $msg .= '--' . $boundary . "--";
-    return smtp_deliver($to, $msg);
+    return smtp_deliver($to, $msg, $fromUser, $fromAddr);
 }

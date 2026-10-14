@@ -28,30 +28,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: requests.php');
         exit;
     } elseif ($action === 'make_customer') {
-        // Reuse an existing customer with the same email if present
-        $cid = null;
+        // Reuse a business by main email or an existing contact email
+        $bid = null;
         if (!empty($r['email'])) {
-            $f = db()->prepare('SELECT id FROM customers WHERE email = ? LIMIT 1');
-            $f->execute([$r['email']]);
-            $cid = $f->fetchColumn() ?: null;
+            $f = db()->prepare('SELECT b.id FROM businesses b LEFT JOIN contacts c ON c.business_id=b.id WHERE b.main_email=? OR c.email=? LIMIT 1');
+            $f->execute([$r['email'], $r['email']]);
+            $bid = $f->fetchColumn() ?: null;
         }
-        if (!$cid) {
-            $ins = db()->prepare('INSERT INTO customers (name, business, email, phone) VALUES (?,?,?,?)');
-            $ins->execute([$r['name'], $r['business'], $r['email'], $r['phone']]);
-            $cid = (int) db()->lastInsertId();
+        if (!$bid) {
+            $bname = trim((string)($r['business'] ?: $r['name'])) ?: 'New customer';
+            $ins = db()->prepare('INSERT INTO businesses (name, main_email, main_phone) VALUES (?,?,?)');
+            $ins->execute([$bname, $r['email'], $r['phone']]);
+            $bid = (int) db()->lastInsertId();
+            $parts = preg_split('/\s+/', trim((string)$r['name']), 2);
+            db()->prepare('INSERT INTO contacts (business_id, first_name, last_name, email, phone) VALUES (?,?,?,?,?)')
+               ->execute([$bid, $parts[0] ?? '', $parts[1] ?? '', $r['email'], $r['phone']]);
         }
-        $u = db()->prepare('UPDATE requests SET customer_id = ? WHERE id = ?');
-        $u->execute([$cid, $id]);
-        header('Location: customer.php?id=' . (int)$cid . '&from=request');
+        db()->prepare('UPDATE requests SET business_id = ? WHERE id = ?')->execute([$bid, $id]);
+        header('Location: customer.php?id=' . (int)$bid . '&from=request');
         exit;
     }
 }
 
-// Linked customer (if any)
+// Linked business (if any)
 $cust = null;
-if (!empty($r['customer_id'])) {
-    $c = db()->prepare('SELECT * FROM customers WHERE id = ?');
-    $c->execute([$r['customer_id']]);
+if (!empty($r['business_id'])) {
+    $c = db()->prepare('SELECT * FROM businesses WHERE id = ?');
+    $c->execute([$r['business_id']]);
     $cust = $c->fetch();
 }
 

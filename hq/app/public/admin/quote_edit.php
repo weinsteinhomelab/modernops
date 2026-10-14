@@ -20,12 +20,14 @@ if ($id) {
 $err = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
-    $customer_id = (int)($_POST['customer_id'] ?? 0);
+    $business_id = (int)($_POST['business_id'] ?? 0);
+    $contact_id = (int)($_POST['contact_id'] ?? 0) ?: null;
     $quote_number = trim($_POST['quote_number'] ?? '');
     $issue_date = $_POST['issue_date'] ?? date('Y-m-d');
     $valid_until = $_POST['valid_until'] ?? null;
     $tax_rate = (float)($_POST['tax_rate'] ?? 0);
     $tax_label = trim($_POST['tax_label'] ?? 'Sales Tax');
+    $scope = trim($_POST['scope_of_work'] ?? '');
     $notes = trim($_POST['notes'] ?? '');
     $terms_included = isset($_POST['terms_included']) ? 1 : 0;
     $status = $_POST['status'] ?? 'draft';
@@ -37,8 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $prices  = $_POST['item_price']   ?? [];
     $bills   = $_POST['item_billing'] ?? [];
 
-    if (!$customer_id) {
-        $err = 'Please choose a customer.';
+    if (!$business_id) {
+        $err = 'Please choose a business.';
     } elseif ($quote_number === '') {
         $err = 'Please enter a quote number.';
     } else {
@@ -46,13 +48,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo = db();
             $pdo->beginTransaction();
             if ($id) {
-                $u = $pdo->prepare('UPDATE quotes SET customer_id=?, quote_number=?, issue_date=?, valid_until=?, status=?, tax_rate=?, tax_label=?, notes=?, terms_included=? WHERE id=?');
-                $u->execute([$customer_id,$quote_number,$issue_date,$valid_until ?: null,$status,$tax_rate,$tax_label,$notes,$terms_included,$id]);
+                $u = $pdo->prepare('UPDATE quotes SET business_id=?, contact_id=?, quote_number=?, issue_date=?, valid_until=?, status=?, tax_rate=?, tax_label=?, scope_of_work=?, notes=?, terms_included=? WHERE id=?');
+                $u->execute([$business_id,$contact_id,$quote_number,$issue_date,$valid_until ?: null,$status,$tax_rate,$tax_label,$scope,$notes,$terms_included,$id]);
                 $pdo->prepare('DELETE FROM quote_items WHERE quote_id = ?')->execute([$id]);
                 $qid = $id;
             } else {
-                $ins = $pdo->prepare('INSERT INTO quotes (customer_id, quote_number, issue_date, valid_until, status, tax_rate, tax_label, notes, terms_included) VALUES (?,?,?,?,?,?,?,?,?)');
-                $ins->execute([$customer_id,$quote_number,$issue_date,$valid_until ?: null,$status,$tax_rate,$tax_label,$notes,$terms_included]);
+                $ins = $pdo->prepare('INSERT INTO quotes (business_id, contact_id, quote_number, issue_date, valid_until, status, tax_rate, tax_label, scope_of_work, notes, terms_included) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
+                $ins->execute([$business_id,$contact_id,$quote_number,$issue_date,$valid_until ?: null,$status,$tax_rate,$tax_label,$scope,$notes,$terms_included]);
                 $qid = (int)$pdo->lastInsertId();
                 // advance the auto quote number if this used the current default
                 if ($quote_number === (string)setting('next_quote_number')) {
@@ -82,15 +84,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$customers = db()->query('SELECT id, name, business FROM customers ORDER BY name')->fetchAll();
+$businesses = db()->query('SELECT id, name FROM businesses ORDER BY name')->fetchAll();
+$allContacts = db()->query("SELECT id, business_id, TRIM(CONCAT(COALESCE(first_name,''),' ',COALESCE(last_name,''))) AS name, title FROM contacts ORDER BY id")->fetchAll();
 $catalog = db()->query("SELECT title, description, unit_price, billing FROM catalog_items WHERE active=1 ORDER BY billing, sort_order, title")->fetchAll();
 
-$preCustomer = (int)($_GET['customer'] ?? ($quote['customer_id'] ?? 0));
+$preBusiness = (int)($_GET['business'] ?? ($quote['business_id'] ?? 0));
+$preContact  = (int)($quote['contact_id'] ?? 0);
 $defNumber = $quote['quote_number'] ?? (string)setting('next_quote_number', '1001');
 $defIssue  = $quote['issue_date'] ?? date('Y-m-d');
 $defValid  = $quote['valid_until'] ?? date('Y-m-d', strtotime('+30 days'));
 $defTaxRate = $quote['tax_rate'] ?? setting('default_tax_rate', '0');
 $defTaxLabel = $quote['tax_label'] ?? setting('default_tax_label', 'Sales Tax');
+$defScope = $quote['scope_of_work'] ?? '';
 $defNotes = $quote['notes'] ?? "Quote valid for 30 days from issue date. Payment due upon acceptance.";
 $termsChecked = !isset($quote['terms_included']) || $quote['terms_included'] ? 'checked' : '';
 
@@ -106,22 +111,29 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
   <div class="card">
     <div class="grid3" style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:.75rem">
       <div>
-        <label>Customer</label>
-        <select name="customer_id" required>
+        <label>Business</label>
+        <select name="business_id" id="businessSel" required>
           <option value="">— choose —</option>
-          <?php foreach ($customers as $c): ?>
-            <option value="<?= (int)$c['id'] ?>"<?= $preCustomer === (int)$c['id'] ? ' selected' : '' ?>><?= e($c['name']) ?><?= $c['business'] ? ' — ' . e($c['business']) : '' ?></option>
+          <?php foreach ($businesses as $bz): ?>
+            <option value="<?= (int)$bz['id'] ?>"<?= $preBusiness === (int)$bz['id'] ? ' selected' : '' ?>><?= e($bz['name']) ?></option>
           <?php endforeach; ?>
         </select>
-        <?php if (!$customers): ?><div class="muted" style="font-size:.78rem;margin-top:.3rem">No customers yet — <a href="customer_edit.php">add one</a> first.</div><?php endif; ?>
+        <?php if (!$businesses): ?><div class="muted" style="font-size:.78rem;margin-top:.3rem">No businesses yet — <a href="customer_edit.php">add one</a> first.</div><?php endif; ?>
       </div>
+      <div><label>Prepared for (contact)</label><select name="contact_id" id="contactSel"><option value="">— optional —</option></select></div>
       <div><label>Quote #</label><input type="text" name="quote_number" value="<?= e($defNumber) ?>" required></div>
-      <div><label>Status</label><select name="status"><?php foreach (['draft','sent','accepted','declined'] as $s): ?><option value="<?= $s ?>"<?= ($quote['status'] ?? 'draft')===$s?' selected':'' ?>><?= ucfirst($s) ?></option><?php endforeach; ?></select></div>
     </div>
-    <div class="grid2" style="grid-template-columns:1fr 1fr">
+    <div class="grid3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem">
       <div><label>Quote date</label><input type="date" name="issue_date" value="<?= e($defIssue) ?>"></div>
       <div><label>Valid until</label><input type="date" name="valid_until" value="<?= e($defValid) ?>"></div>
+      <div><label>Status</label><select name="status"><?php foreach (['draft','sent','accepted','declined'] as $s): ?><option value="<?= $s ?>"<?= ($quote['status'] ?? 'draft')===$s?' selected':'' ?>><?= ucfirst($s) ?></option><?php endforeach; ?></select></div>
     </div>
+  </div>
+
+  <div class="card">
+    <strong>Scope of work</strong>
+    <label>Describe the work this quote covers (appears on the quote)</label>
+    <textarea name="scope_of_work" rows="3" placeholder="e.g. Design and build a 5-page mobile-friendly website, configure hosting and SSL, set up a business email account, and submit the Google Business Profile."><?= e($defScope) ?></textarea>
   </div>
 
   <div class="card">
@@ -179,8 +191,26 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
     {label:"FL — 6%", rate:"6", name:"FL Sales Tax"}
   ];
 
+  var CONTACTS = <?= json_encode($allContacts, JSON_UNESCAPED_SLASHES) ?>;
+  var PRE_CONTACT = <?= (int)$preContact ?>;
+
   function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
   function money(n){return '$'+(Number(n)||0).toFixed(2);}
+
+  // Populate the "Prepared for (contact)" dropdown from the chosen business.
+  var bizSel = document.getElementById('businessSel'), contactSel = document.getElementById('contactSel');
+  function fillContacts(){
+    var bid = parseInt(bizSel.value, 10) || 0;
+    contactSel.innerHTML = '<option value="">— optional —</option>';
+    CONTACTS.filter(function(c){return parseInt(c.business_id,10)===bid;}).forEach(function(c){
+      var o=document.createElement('option'); o.value=c.id;
+      o.textContent = (c.name||'(unnamed)') + (c.title? ' — '+c.title : '');
+      if (parseInt(c.id,10)===PRE_CONTACT) o.selected=true;
+      contactSel.appendChild(o);
+    });
+  }
+  bizSel.addEventListener('change', fillContacts);
+  fillContacts();
 
   var cp = document.getElementById('catalogPick');
   CATALOG.forEach(function(c,i){var o=document.createElement('option');o.value=i;o.textContent=c.title+' — $'+Number(c.unit_price).toFixed(2)+(c.billing==='monthly'?'/mo':'');cp.appendChild(o);});

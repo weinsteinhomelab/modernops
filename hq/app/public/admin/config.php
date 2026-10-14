@@ -31,6 +31,11 @@ define('SMTP_PASS',   envv('SMTP_PASS', ''));
 define('MAIL_FROM',   envv('MAIL_FROM', 'info@modern-ops.net'));
 define('MAIL_FROM_NAME', envv('MAIL_FROM_NAME', 'Modern Ops'));
 
+// Quotes are sent from a dedicated mailbox (same password as the others).
+define('QUOTE_SMTP_USER', envv('QUOTE_SMTP_USER', 'quotes@modern-ops.net'));
+define('QUOTE_MAIL_FROM', envv('QUOTE_MAIL_FROM', 'quotes@modern-ops.net'));
+define('QUOTE_MAIL_FROM_NAME', envv('QUOTE_MAIL_FROM_NAME', 'Modern Ops Quotes'));
+
 // ---- Business info shown on quotes ----
 define('BIZ_NAME',     envv('BIZ_NAME', 'Modern Ops'));
 define('BIZ_EMAIL',    envv('BIZ_EMAIL', 'info@modern-ops.net'));

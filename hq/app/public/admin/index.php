@@ -6,7 +6,7 @@ require_login();
 
 $newReqs   = (int) db()->query("SELECT COUNT(*) FROM requests WHERE status='new'")->fetchColumn();
 $allReqs   = (int) db()->query("SELECT COUNT(*) FROM requests")->fetchColumn();
-$customers = (int) db()->query("SELECT COUNT(*) FROM customers")->fetchColumn();
+$customers = (int) db()->query("SELECT COUNT(*) FROM businesses")->fetchColumn();
 $openQuotes = 0;
 try { $openQuotes = (int) db()->query("SELECT COUNT(*) FROM quotes WHERE status IN ('draft','sent')")->fetchColumn(); } catch (Exception $ex) {}
 

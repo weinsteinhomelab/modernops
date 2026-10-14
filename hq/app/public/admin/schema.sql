@@ -1,5 +1,5 @@
--- Modern Ops HQ — database schema
--- Run automatically by setup.php (or import via phpMyAdmin).
+-- Modern Ops HQ — database schema (fresh installs). Existing databases are
+-- upgraded by _migrate.php instead.
 
 CREATE TABLE IF NOT EXISTS admin_users (
   id            INT AUTO_INCREMENT PRIMARY KEY,
@@ -8,23 +8,50 @@ CREATE TABLE IF NOT EXISTS admin_users (
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS customers (
+CREATE TABLE IF NOT EXISTS businesses (
   id         INT AUTO_INCREMENT PRIMARY KEY,
-  name       VARCHAR(160) NOT NULL,
-  business   VARCHAR(160) DEFAULT NULL,
-  email      VARCHAR(190) DEFAULT NULL,
-  phone      VARCHAR(60)  DEFAULT NULL,
+  name       VARCHAR(190) NOT NULL,
+  vertical   VARCHAR(120) DEFAULT NULL,
+  main_phone VARCHAR(60)  DEFAULT NULL,
+  main_email VARCHAR(190) DEFAULT NULL,
   address    VARCHAR(255) DEFAULT NULL,
-  notes      TEXT         DEFAULT NULL,
+  address2   VARCHAR(255) DEFAULT NULL,
+  city       VARCHAR(120) DEFAULT NULL,
+  state      VARCHAR(80)  DEFAULT NULL,
+  country    VARCHAR(80)  DEFAULT NULL,
+  zip        VARCHAR(30)  DEFAULT NULL,
+  notes      TEXT DEFAULT NULL,
+  legacy_customer_id INT DEFAULT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX (name),
-  INDEX (email)
+  INDEX (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS contacts (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  business_id INT NOT NULL,
+  first_name  VARCHAR(120) DEFAULT NULL,
+  last_name   VARCHAR(120) DEFAULT NULL,
+  email       VARCHAR(190) DEFAULT NULL,
+  phone       VARCHAR(60)  DEFAULT NULL,
+  title       VARCHAR(120) DEFAULT NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX (business_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS touchpoints (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  business_id INT NOT NULL,
+  tp_date     DATE NOT NULL,
+  tp_type     ENUM('Call','Email','Text','Voicemail','Meeting','Other') NOT NULL DEFAULT 'Call',
+  note        TEXT DEFAULT NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX (business_id), INDEX (tp_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS requests (
   id          INT AUTO_INCREMENT PRIMARY KEY,
-  customer_id INT DEFAULT NULL,
+  business_id INT DEFAULT NULL,
   name        VARCHAR(160) NOT NULL,
   business    VARCHAR(160) DEFAULT NULL,
   email       VARCHAR(190) DEFAULT NULL,
@@ -34,14 +61,13 @@ CREATE TABLE IF NOT EXISTS requests (
   status      ENUM('new','contacted','quoted','won','closed') NOT NULL DEFAULT 'new',
   source      VARCHAR(40) NOT NULL DEFAULT 'website',
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX (status),
-  INDEX (created_at),
-  INDEX (customer_id)
+  INDEX (status), INDEX (created_at), INDEX (business_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS quotes (
   id           INT AUTO_INCREMENT PRIMARY KEY,
-  customer_id  INT NOT NULL,
+  business_id  INT NOT NULL,
+  contact_id   INT DEFAULT NULL,
   quote_number VARCHAR(40) NOT NULL UNIQUE,
   issue_date   DATE NOT NULL,
   valid_until  DATE DEFAULT NULL,
@@ -49,12 +75,12 @@ CREATE TABLE IF NOT EXISTS quotes (
   tax_rate     DECIMAL(6,3) NOT NULL DEFAULT 0,
   tax_label    VARCHAR(80) NOT NULL DEFAULT 'Sales Tax',
   discount     DECIMAL(10,2) NOT NULL DEFAULT 0,
+  scope_of_work TEXT DEFAULT NULL,
   notes        TEXT DEFAULT NULL,
   terms_included TINYINT NOT NULL DEFAULT 1,
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX (customer_id),
-  INDEX (status)
+  INDEX (business_id), INDEX (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS quote_items (
@@ -84,13 +110,11 @@ CREATE TABLE IF NOT EXISTS settings (
   v TEXT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Records login attempts for brute-force throttling
 CREATE TABLE IF NOT EXISTS login_attempts (
   id         INT AUTO_INCREMENT PRIMARY KEY,
   ip         VARCHAR(64) NOT NULL,
   username   VARCHAR(80) DEFAULT NULL,
   ok         TINYINT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX (ip),
-  INDEX (created_at)
+  INDEX (ip), INDEX (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

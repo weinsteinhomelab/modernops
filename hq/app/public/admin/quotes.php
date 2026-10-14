@@ -5,8 +5,8 @@ require_once __DIR__ . '/_layout.php';
 require_login();
 
 $rows = db()->query(
-    "SELECT q.*, c.name AS customer_name, c.business AS customer_business
-     FROM quotes q JOIN customers c ON c.id = q.customer_id
+    "SELECT q.*, b.name AS customer_name
+     FROM quotes q JOIN businesses b ON b.id = q.business_id
      ORDER BY q.created_at DESC"
 )->fetchAll();
 
@@ -37,7 +37,7 @@ layout_header('Quotes', 'quotes.php');
       <?php foreach ($rows as $q): ?>
         <tr>
           <td><strong><?= e($q['quote_number']) ?></strong></td>
-          <td><?= e($q['customer_name']) ?><?= $q['customer_business'] ? '<br><span class="muted">' . e($q['customer_business']) . '</span>' : '' ?></td>
+          <td><?= e($q['customer_name']) ?></td>
           <td class="muted"><?= e(date('M j, Y', strtotime($q['issue_date']))) ?></td>
           <td><?= money(quote_onetime_total((int)$q['id'])) ?></td>
           <td><span class="badge <?= e($q['status']) ?>"><?= e($q['status']) ?></span></td>
