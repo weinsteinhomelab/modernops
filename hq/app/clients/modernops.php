@@ -14,7 +14,7 @@ return [
     'monogram'  => 'MO',                 // favicon letters (first letter dark, rest white)
     'logo'      => '',                   // optional image URL for the top bar and login page; blank = text name
     'tagline'   => 'Web & business operations for small businesses',
-    'location'  => 'Delaware Valley, PA',
+    'location'  => 'Serving clients across the US',
     'domain'    => 'modern-ops.net',     // bare domain, no https://
     'site_origin' => 'https://modern-ops.net', // the website allowed to post leads to /api/submit.php
 
