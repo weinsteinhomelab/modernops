@@ -47,8 +47,10 @@ CREATE TABLE IF NOT EXISTS quotes (
   valid_until  DATE DEFAULT NULL,
   status       ENUM('draft','sent','accepted','declined') NOT NULL DEFAULT 'draft',
   tax_rate     DECIMAL(6,3) NOT NULL DEFAULT 0,
+  tax_label    VARCHAR(80) NOT NULL DEFAULT 'Sales Tax',
   discount     DECIMAL(10,2) NOT NULL DEFAULT 0,
   notes        TEXT DEFAULT NULL,
+  terms_included TINYINT NOT NULL DEFAULT 1,
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX (customer_id),
@@ -58,11 +60,23 @@ CREATE TABLE IF NOT EXISTS quotes (
 CREATE TABLE IF NOT EXISTS quote_items (
   id          INT AUTO_INCREMENT PRIMARY KEY,
   quote_id    INT NOT NULL,
-  description VARCHAR(255) NOT NULL,
+  title       VARCHAR(190) NOT NULL DEFAULT '',
+  description VARCHAR(255) DEFAULT NULL,
   quantity    DECIMAL(10,2) NOT NULL DEFAULT 1,
   unit_price  DECIMAL(10,2) NOT NULL DEFAULT 0,
+  billing     ENUM('one_time','monthly') NOT NULL DEFAULT 'one_time',
   sort_order  INT NOT NULL DEFAULT 0,
   INDEX (quote_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS catalog_items (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  title       VARCHAR(190) NOT NULL,
+  description VARCHAR(255) DEFAULT NULL,
+  unit_price  DECIMAL(10,2) NOT NULL DEFAULT 0,
+  billing     ENUM('one_time','monthly') NOT NULL DEFAULT 'one_time',
+  active      TINYINT NOT NULL DEFAULT 1,
+  sort_order  INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS settings (

@@ -40,8 +40,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Create admin
             $st = db()->prepare('INSERT INTO admin_users (username, password_hash) VALUES (?, ?)');
             $st->execute([$user, password_hash($pass, PASSWORD_DEFAULT)]);
-            // Seed a starting quote number
-            set_setting('next_quote_number', '1001');
+            // Seed catalog + defaults and mark schema current
+            require_once __DIR__ . '/_migrate.php';
+            seed_catalog();
+            seed_defaults();
+            set_setting('schema_version', (string) SCHEMA_VERSION);
             header('Location: login.php?setup=1');
             exit;
         } catch (Exception $ex) {

@@ -53,16 +53,16 @@ layout_header($c['name'], 'customers.php');
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
     <strong>Quotes</strong>
-    <span class="muted" style="font-size:.82rem">Quote builder arrives in Phase 2</span>
+    <a href="quote_edit.php?customer=<?= (int)$c['id'] ?>" class="btn small">+ New quote</a>
   </div>
   <?php if (!$quotes): ?>
     <div class="empty" style="padding:1.25rem">No quotes yet.</div>
   <?php else: ?>
     <table>
-      <thead><tr><th>Quote #</th><th>Date</th><th>Status</th></tr></thead>
+      <thead><tr><th>Quote #</th><th>Date</th><th>Status</th><th></th></tr></thead>
       <tbody>
       <?php foreach ($quotes as $qrow): ?>
-        <tr><td><?= e($qrow['quote_number']) ?></td><td><?= e($qrow['issue_date']) ?></td><td><span class="badge <?= e($qrow['status']) ?>"><?= e($qrow['status']) ?></span></td></tr>
+        <tr><td><strong><?= e($qrow['quote_number']) ?></strong></td><td class="muted"><?= e(date('M j, Y', strtotime($qrow['issue_date']))) ?></td><td><span class="badge <?= e($qrow['status']) ?>"><?= e($qrow['status']) ?></span></td><td><a href="quote_view.php?id=<?= (int)$qrow['id'] ?>" class="btn secondary small">Open</a></td></tr>
       <?php endforeach; ?>
       </tbody>
     </table>

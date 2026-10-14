@@ -1,0 +1,86 @@
+<?php
+/** Saved line items (service catalog) — add, edit, retire. */
+require_once __DIR__ . '/_auth.php';
+require_once __DIR__ . '/_layout.php';
+require_login();
+
+$msg = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    check_csrf();
+    $action = $_POST['action'] ?? '';
+    if ($action === 'add') {
+        $title = trim($_POST['title'] ?? '');
+        if ($title !== '') {
+            $st = db()->prepare('INSERT INTO catalog_items (title, description, unit_price, billing, sort_order)
+                                 VALUES (?,?,?,?, (SELECT COALESCE(MAX(sort_order)+1,0) FROM catalog_items c))');
+            $st->execute([
+                $title,
+                trim($_POST['description'] ?? ''),
+                (float)($_POST['unit_price'] ?? 0),
+                ($_POST['billing'] ?? 'one_time') === 'monthly' ? 'monthly' : 'one_time',
+            ]);
+            $msg = 'Item added.';
+        }
+    } elseif ($action === 'toggle') {
+        db()->prepare('UPDATE catalog_items SET active = 1 - active WHERE id = ?')->execute([(int)($_POST['id'] ?? 0)]);
+    } elseif ($action === 'delete') {
+        db()->prepare('DELETE FROM catalog_items WHERE id = ?')->execute([(int)($_POST['id'] ?? 0)]);
+        $msg = 'Item deleted.';
+    }
+}
+
+$rows = db()->query('SELECT * FROM catalog_items ORDER BY billing, sort_order, title')->fetchAll();
+
+layout_header('Catalog', 'catalog.php');
+?>
+<h1 class="page">Service catalog</h1>
+<p class="sub">Your reusable line items. Add them to any quote with one click.</p>
+<?php if ($msg) flash('ok', $msg); ?>
+
+<div class="card">
+  <strong>Add a saved item</strong>
+  <form method="post" style="margin-top:.6rem">
+    <?= csrf_field() ?>
+    <input type="hidden" name="action" value="add">
+    <div class="grid2" style="grid-template-columns:1.4fr 2fr">
+      <div><label>Title</label><input type="text" name="title" required placeholder="e.g. Logo Design"></div>
+      <div><label>Description</label><input type="text" name="description" placeholder="Short description shown on the quote"></div>
+    </div>
+    <div class="grid2" style="grid-template-columns:1fr 1fr auto;align-items:end">
+      <div><label>Unit price ($)</label><input type="number" step="0.01" min="0" name="unit_price" value="0"></div>
+      <div><label>Billing</label><select name="billing"><option value="one_time">One-time</option><option value="monthly">Monthly</option></select></div>
+      <div><button class="btn" type="submit">Add item</button></div>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <strong>Saved items</strong>
+  <?php if (!$rows): ?>
+    <div class="empty" style="padding:1.5rem">No items yet. Add your first above.</div>
+  <?php else: ?>
+    <table style="margin-top:.6rem">
+      <thead><tr><th>Title</th><th>Description</th><th>Price</th><th>Billing</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      <?php foreach ($rows as $c): ?>
+        <tr style="<?= $c['active'] ? '' : 'opacity:.5' ?>">
+          <td><strong><?= e($c['title']) ?></strong></td>
+          <td class="muted" style="font-size:.82rem"><?= e($c['description']) ?></td>
+          <td><?= money($c['unit_price']) ?><?= $c['billing']==='monthly' ? '/mo' : '' ?></td>
+          <td><?= $c['billing']==='monthly' ? 'Monthly' : 'One-time' ?></td>
+          <td><?= $c['active'] ? '<span class="badge won">Active</span>' : '<span class="badge closed">Retired</span>' ?></td>
+          <td>
+            <div class="row-actions">
+              <a href="catalog_edit.php?id=<?= (int)$c['id'] ?>" class="btn secondary small">Edit</a>
+              <form method="post" onsubmit="return true" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="toggle"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><button class="btn secondary small"><?= $c['active'] ? 'Retire' : 'Restore' ?></button></form>
+              <form method="post" onsubmit="return confirm('Delete this saved item?')" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><button class="btn danger small">Delete</button></form>
+            </div>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php endif; ?>
+</div>
+<?php
+layout_footer();

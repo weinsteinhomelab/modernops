@@ -1,30 +1,48 @@
 <?php
-/** Quotes list. Phase 1 placeholder — full builder arrives in Phase 2. */
+/** Quotes list. */
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
 require_login();
 
-$rows = [];
-try { $rows = db()->query("SELECT q.*, c.name AS customer FROM quotes q JOIN customers c ON c.id=q.customer_id ORDER BY q.created_at DESC")->fetchAll(); }
-catch (Exception $ex) {}
+$rows = db()->query(
+    "SELECT q.*, c.name AS customer_name, c.business AS customer_business
+     FROM quotes q JOIN customers c ON c.id = q.customer_id
+     ORDER BY q.created_at DESC"
+)->fetchAll();
+
+// Totals per quote (one-time) for the list
+function quote_onetime_total(int $qid): float {
+    $st = db()->prepare("SELECT COALESCE(SUM(quantity*unit_price),0) FROM quote_items WHERE quote_id=? AND billing='one_time'");
+    $st->execute([$qid]);
+    return (float)$st->fetchColumn();
+}
 
 layout_header('Quotes', 'quotes.php');
 ?>
-<h1 class="page">Quotes</h1>
-<p class="sub">Create and send quotes to customers.</p>
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem">
+  <div>
+    <h1 class="page">Quotes</h1>
+    <p class="sub">Create, send, and track quotes.</p>
+  </div>
+  <a href="quote_edit.php" class="btn">+ New quote</a>
+</div>
 
 <div class="card">
   <?php if (!$rows): ?>
-    <div class="empty">
-      The quote builder is coming in <strong>Phase 2</strong> — create a quote with line items, generate a branded PDF, and email it to the customer from info@modern-ops.net.<br><br>
-      For now, Phase 1 gives you the dashboard, website requests, and customer records.
-    </div>
+    <div class="empty">No quotes yet. Click <strong>New quote</strong> to build your first.</div>
   <?php else: ?>
     <table>
-      <thead><tr><th>Quote #</th><th>Customer</th><th>Date</th><th>Status</th></tr></thead>
+      <thead><tr><th>Quote #</th><th>Customer</th><th>Date</th><th>One-time</th><th>Status</th><th></th></tr></thead>
       <tbody>
       <?php foreach ($rows as $q): ?>
-        <tr><td><?= e($q['quote_number']) ?></td><td><?= e($q['customer']) ?></td><td><?= e($q['issue_date']) ?></td><td><span class="badge <?= e($q['status']) ?>"><?= e($q['status']) ?></span></td></tr>
+        <tr>
+          <td><strong><?= e($q['quote_number']) ?></strong></td>
+          <td><?= e($q['customer_name']) ?><?= $q['customer_business'] ? '<br><span class="muted">' . e($q['customer_business']) . '</span>' : '' ?></td>
+          <td class="muted"><?= e(date('M j, Y', strtotime($q['issue_date']))) ?></td>
+          <td><?= money(quote_onetime_total((int)$q['id'])) ?></td>
+          <td><span class="badge <?= e($q['status']) ?>"><?= e($q['status']) ?></span></td>
+          <td><a href="quote_view.php?id=<?= (int)$q['id'] ?>" class="btn secondary small">Open</a></td>
+        </tr>
       <?php endforeach; ?>
       </tbody>
     </table>

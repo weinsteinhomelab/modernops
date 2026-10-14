@@ -30,6 +30,8 @@ function current_username(): string { return $_SESSION['uname'] ?? ''; }
 
 function require_login(): void {
     if (!current_user()) { header('Location: login.php'); exit; }
+    require_once __DIR__ . '/_migrate.php';
+    maybe_migrate();
 }
 
 function login_user(array $user): void {

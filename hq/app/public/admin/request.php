@@ -23,6 +23,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $r['status'] = $new;
             $msg = 'Status updated.';
         }
+    } elseif ($action === 'delete') {
+        db()->prepare('DELETE FROM requests WHERE id = ?')->execute([$id]);
+        header('Location: requests.php');
+        exit;
     } elseif ($action === 'make_customer') {
         // Reuse an existing customer with the same email if present
         $cid = null;
@@ -101,6 +105,13 @@ layout_header('Request', 'requests.php');
 <div class="card">
   <strong>Message</strong>
   <p style="margin-top:.5rem;white-space:pre-wrap"><?= $r['message'] ? e($r['message']) : '<span class="muted">(no message)</span>' ?></p>
+</div>
+
+<div style="text-align:right">
+  <form method="post" onsubmit="return confirm('Delete this request permanently?')">
+    <?= csrf_field() ?><input type="hidden" name="action" value="delete">
+    <button class="btn danger small">Delete request</button>
+  </form>
 </div>
 <?php
 layout_footer();

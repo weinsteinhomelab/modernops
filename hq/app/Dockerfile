@@ -11,6 +11,7 @@ RUN set -eux; \
     a2enmod rewrite headers
 
 COPY public/ /var/www/html/public/
+COPY lib/ /var/www/html/lib/
 RUN chown -R www-data:www-data /var/www/html
 
 EXPOSE 80
