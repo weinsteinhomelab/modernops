@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Modern Ops HQ</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%231a6b4a'/%3E%3Ctext%20x='16'%20y='21.5'%20font-family='Georgia,serif'%20font-size='16'%20font-weight='700'%20text-anchor='middle'%3E%3Ctspan%20fill='%231a1a1a'%3EM%3C/tspan%3E%3Ctspan%20fill='%23ffffff'%3EO%3C/tspan%3E%3C/text%3E%3C/svg%3E">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#eef0ec;--surface:#fff;--text:#1a1a1a;--muted:#5a5a5a;--border:#e2e2dd;--accent:#1a6b4a;--accent-text:#fff;--shadow:0 10px 40px rgba(0,0,0,.08)}
+  :root[data-theme="dark"]{--bg:#11161a;--surface:#1b2328;--text:#eef1ee;--muted:#9fb0aa;--border:#2a353b;--accent:#35b082;--accent-text:#06130d;--shadow:0 10px 40px rgba(0,0,0,.45)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#11161a;--surface:#1b2328;--text:#eef1ee;--muted:#9fb0aa;--border:#2a353b;--accent:#35b082;--accent-text:#06130d;--shadow:0 10px 40px rgba(0,0,0,.45)}}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.25rem}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);width:100%;max-width:400px;padding:2.4rem 2rem;text-align:center}
+  .logo{width:56px;height:56px;border-radius:13px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-weight:700;font-size:1.6rem;margin:0 auto 1.2rem}
+  .logo .m{color:#1a1a1a}.logo .o{color:#fff}
+  h1{font-family:Georgia,serif;font-size:1.45rem;margin-bottom:.4rem}
+  p.tag{color:var(--muted);font-size:.9rem;margin-bottom:1.6rem}
+  a.btn{display:block;padding:.85rem;border-radius:10px;background:var(--accent);color:var(--accent-text);font-weight:700;text-decoration:none}
+  a.btn:hover{opacity:.92}
+  .note{color:var(--muted);font-size:.78rem;margin-top:1.2rem}
+  .themebtn{position:fixed;top:1rem;right:1rem;background:var(--surface);border:1px solid var(--border);color:var(--text);width:40px;height:40px;border-radius:10px;cursor:pointer;font-size:1.1rem}
+</style>
+</head>
+<body>
+<button class="themebtn" id="themebtn" type="button" aria-label="Toggle theme">◐</button>
+<div class="card">
+  <div class="logo"><span class="m">M</span><span class="o">O</span></div>
+  <h1>Modern Ops HQ</h1>
+  <p class="tag">Private dashboard — taking you to the secure login…</p>
+  <a class="btn" id="enter" href="#">Enter dashboard &rarr;</a>
+  <div class="note">If you're not redirected automatically, tap the button above.</div>
+</div>
+<script>
+  // Set this to your dashboard's Cloudflare Tunnel URL once it exists.
+  var DASHBOARD_URL = "https://hq.modern-ops.net/";
+
+  document.getElementById('enter').href = DASHBOARD_URL;
+  // Theme toggle
+  (function(){
+    var root=document.documentElement, btn=document.getElementById('themebtn');
+    try{var s=localStorage.getItem('mohq-theme'); if(s) root.setAttribute('data-theme',s);}catch(e){}
+    function cur(){return root.getAttribute('data-theme')||(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');}
+    btn.addEventListener('click',function(){var n=cur()==='dark'?'light':'dark';root.setAttribute('data-theme',n);try{localStorage.setItem('mohq-theme',n);}catch(e){}});
+  })();
+  // Auto-forward after a short beat
+  setTimeout(function(){ if(DASHBOARD_URL && DASHBOARD_URL.indexOf('http')===0){ window.location.href = DASHBOARD_URL; } }, 1200);
+</script>
+</body>
+</html>
