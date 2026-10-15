@@ -2,7 +2,7 @@
 /** Idempotent schema migrations so a live database upgrades itself safely. */
 require_once __DIR__ . '/_db.php';
 
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 /** Starting pricebook for an empty Catalog: the "catalog" list in the client file. */
 function catalog_defaults(): array {
@@ -161,6 +161,60 @@ function run_phase8_migration(): void {
     foreach ($ddl as $sql) { try { db()->exec($sql); } catch (Exception $ex) {} }
 }
 
+/** Phase 9: people (admins + users), permissions, mailbox access, customer owners, approvals, activity log. */
+function run_phase9_migration(): void {
+    $ddl = [
+        "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS role ENUM('admin','user') NOT NULL DEFAULT 'user' AFTER password_hash",
+        "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS name VARCHAR(120) DEFAULT NULL AFTER role",
+        "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS email VARCHAR(190) DEFAULT NULL AFTER name",
+        "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS active TINYINT NOT NULL DEFAULT 1 AFTER email",
+        "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS must_change_pw TINYINT NOT NULL DEFAULT 0 AFTER active",
+        "ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS last_login_at DATETIME DEFAULT NULL AFTER must_change_pw",
+        "CREATE TABLE IF NOT EXISTS user_permissions (user_id INT NOT NULL, perm VARCHAR(40) NOT NULL, PRIMARY KEY (user_id, perm)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        "CREATE TABLE IF NOT EXISTS user_mailboxes (user_id INT NOT NULL, mailbox VARCHAR(190) NOT NULL, PRIMARY KEY (user_id, mailbox)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        "ALTER TABLE businesses ADD COLUMN IF NOT EXISTS assigned_to INT DEFAULT NULL AFTER notes",
+        "ALTER TABLE businesses ADD INDEX IF NOT EXISTS businesses_assigned (assigned_to)",
+        "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS created_by INT DEFAULT NULL AFTER business_id",
+        "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS approval_status ENUM('none','pending','approved','rejected') NOT NULL DEFAULT 'none' AFTER status",
+        "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS approval_hash VARCHAR(64) DEFAULT NULL AFTER approval_status",
+        "CREATE TABLE IF NOT EXISTS approvals (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            type ENUM('catalog_add','catalog_edit','quote_pricing') NOT NULL,
+            status ENUM('pending','approved','rejected','withdrawn') NOT NULL DEFAULT 'pending',
+            requested_by INT DEFAULT NULL,
+            quote_id INT DEFAULT NULL,
+            catalog_item_id INT DEFAULT NULL,
+            summary VARCHAR(500) NOT NULL DEFAULT '',
+            payload TEXT,
+            decided_by INT DEFAULT NULL,
+            decided_at DATETIME DEFAULT NULL,
+            decision_note VARCHAR(500) DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX (status), INDEX (quote_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        "CREATE TABLE IF NOT EXISTS activity (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT DEFAULT NULL,
+            action VARCHAR(60) NOT NULL,
+            entity VARCHAR(40) DEFAULT NULL,
+            entity_id INT DEFAULT NULL,
+            detail VARCHAR(500) DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX (created_at), INDEX (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+    ];
+    foreach ($ddl as $sql) { try { db()->exec($sql); } catch (Exception $ex) {} }
+    // Everyone who could log in before this was the owner: make them admins and owners of existing records.
+    try {
+        db()->exec("UPDATE admin_users SET role = 'admin'");   // runs once, before any users exist
+        $first = (int) db()->query("SELECT MIN(id) FROM admin_users WHERE role = 'admin'")->fetchColumn();
+        if ($first) {
+            db()->prepare('UPDATE quotes SET created_by = ? WHERE created_by IS NULL')->execute([$first]);
+            db()->prepare('UPDATE businesses SET assigned_to = ? WHERE assigned_to IS NULL')->execute([$first]);
+        }
+    } catch (Exception $ex) {}
+}
+
 function maybe_migrate(): void {
     try {
         $v = (int) (setting('schema_version', '1'));
@@ -172,6 +226,7 @@ function maybe_migrate(): void {
         if ($v < 6) run_phase6_migration();
         if ($v < 7) run_phase7_migration();
         if ($v < 8) run_phase8_migration();
+        if ($v < 9) run_phase9_migration();
         set_setting('schema_version', (string) SCHEMA_VERSION);
     } catch (Exception $ex) {}
 }

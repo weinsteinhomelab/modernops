@@ -31,6 +31,7 @@ return [
         'quotes'    => true,             // Ops Quotes (Catalog included)
         'inbox'     => true,             // Ops Inbox
     ],
+    'seats' => 1,                        // people who can log in (Ops Customers is priced per seat); 0 = no limit
     'previews' => false,                 // Modern Ops only; leave false
 
     'email' => [

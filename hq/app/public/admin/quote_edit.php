@@ -5,6 +5,7 @@ require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_billing.php';
 require_login();
 require_product('quotes');
+require_perm('quotes.create');
 
 $id = (int)($_GET['id'] ?? 0);
 $quote = null;
@@ -14,6 +15,7 @@ if ($id) {
     $st->execute([$id]);
     $quote = $st->fetch();
     if (!$quote) { http_response_code(404); layout_header('Not found','quotes.php'); echo '<div class="card">Quote not found.</div>'; layout_footer(); exit; }
+    if (!can_see_quote($quote)) deny('This quote belongs to someone else.');
     $it = db()->prepare('SELECT * FROM quote_items WHERE quote_id = ? ORDER BY sort_order, id');
     $it->execute([$id]);
     $items = $it->fetchAll();
@@ -47,9 +49,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$business_id) {
         $err = 'Please choose a business.';
+    } elseif (!can_see_business_id($business_id)) {
+        $err = 'Choose one of your customers.';
     } elseif ($quote_number === '') {
         $err = 'Please enter a quote number.';
     } else {
+        // People who can't see costs never send them; keep what was there before, matched by line title.
+        $keepCost = [];
+        if (!can('quotes.costs')) foreach ($items as $old) $keepCost[mb_strtolower(trim($old['title']))] = [$old['unit_cost'], $old['margin']];
         try {
             $pdo = db();
             $pdo->beginTransaction();
@@ -59,8 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->prepare('DELETE FROM quote_items WHERE quote_id = ?')->execute([$id]);
                 $qid = $id;
             } else {
-                $ins = $pdo->prepare('INSERT INTO quotes (business_id, contact_id, quote_number, issue_date, valid_until, status, tax_rate, tax_label, scope_of_work, notes, terms_included) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
-                $ins->execute([$business_id,$contact_id,$quote_number,$issue_date,$valid_until ?: null,$status,$tax_rate,$tax_label,$scope,$notes,$terms_included]);
+                $ins = $pdo->prepare('INSERT INTO quotes (created_by, business_id, contact_id, quote_number, issue_date, valid_until, status, tax_rate, tax_label, scope_of_work, notes, terms_included) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)');
+                $ins->execute([me_id(), $business_id,$contact_id,$quote_number,$issue_date,$valid_until ?: null,$status,$tax_rate,$tax_label,$scope,$notes,$terms_included]);
                 $qid = (int)$pdo->lastInsertId();
                 // advance the auto quote number if this used the current default
                 if ($quote_number === (string)setting('next_quote_number')) {
@@ -74,6 +81,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $t = trim((string)$titles[$i]);
                 if ($t === '') continue;
                 $cost = trim((string)($costs[$i] ?? '')); $mg = trim((string)($margins[$i] ?? ''));
+                if (!can('quotes.costs')) {
+                    [$cost, $mg] = array_map(fn($v) => $v === null ? '' : (string)$v, $keepCost[mb_strtolower($t)] ?? [null, null]);
+                }
                 $opt = empty($opts[$i]) ? 0 : 1;
                 if (!empty($secs[$i])) {
                     // Section heading: title only; billing just records which area (one-time or recurring) it sits in.
@@ -91,6 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
             }
             $pdo->commit();
+            log_activity($id ? 'quote.updated' : 'quote.created', 'quote', $qid, 'Quote #' . $quote_number);
+            quote_after_save($qid);
             header('Location: quote_view.php?id=' . $qid . '&saved=1');
             exit;
         } catch (Exception $ex) {
@@ -100,8 +112,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$businesses = db()->query('SELECT id, name FROM businesses ORDER BY name')->fetchAll();
-$allContacts = db()->query("SELECT id, business_id, TRIM(CONCAT(COALESCE(first_name,''),' ',COALESCE(last_name,''))) AS name, title FROM contacts ORDER BY id")->fetchAll();
+[$bs, $ba] = biz_scope('b');
+$st = db()->prepare("SELECT b.id, b.name FROM businesses b WHERE $bs ORDER BY b.name");
+$st->execute($ba);
+$businesses = $st->fetchAll();
+$canCosts = can('quotes.costs');
+$st = db()->prepare("SELECT c.id, c.business_id, TRIM(CONCAT(COALESCE(c.first_name,''),' ',COALESCE(c.last_name,''))) AS name, c.title
+                     FROM contacts c JOIN businesses b ON b.id = c.business_id WHERE $bs ORDER BY c.id");
+$st->execute($ba);
+$allContacts = $st->fetchAll();
 $catalog = db()->query("SELECT title, description, unit_price, billing FROM catalog_items WHERE active=1 ORDER BY billing, sort_order, title")->fetchAll();
 
 $preBusiness = (int)($_GET['business'] ?? ($quote['business_id'] ?? 0));
@@ -174,7 +193,7 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
       .sec-row input[name="item_title[]"]{font-weight:700;background:var(--bg,transparent)}
     </style>
     <div class="zone-h">One-time <span>— shown first on the quote</span></div>
-    <div class="lhead"><span></span><span>Item</span><span style="text-align:center">Qty</span><span>Our cost</span><span>Margin %</span><span>Total cost</span><span>Billing</span><span style="text-align:right">Line total</span><span></span></div>
+    <div class="lhead"><span></span><span>Item</span><span style="text-align:center">Qty</span><?= $canCosts ? '<span>Our cost</span><span>Margin %</span>' : '' ?><span>Total cost</span><span>Billing</span><span style="text-align:right">Line total</span><span></span></div>
     <div class="zone" id="zoneOne" data-zone="one_time"></div>
     <div class="row-actions" style="margin-top:.5rem">
       <button type="button" class="btn secondary small" data-add="line" data-zone="one_time">+ Line</button>
@@ -182,7 +201,7 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
     </div>
 
     <div class="zone-h">Recurring <span>— always shown at the bottom of the quote</span></div>
-    <div class="lhead"><span></span><span>Item</span><span style="text-align:center">Qty</span><span>Our cost</span><span>Margin %</span><span>Total cost</span><span>Billing</span><span style="text-align:right">Line total</span><span></span></div>
+    <div class="lhead"><span></span><span>Item</span><span style="text-align:center">Qty</span><?= $canCosts ? '<span>Our cost</span><span>Margin %</span>' : '' ?><span>Total cost</span><span>Billing</span><span style="text-align:right">Line total</span><span></span></div>
     <div class="zone" id="zoneRec" data-zone="monthly"></div>
     <div class="row-actions" style="margin-top:.5rem">
       <button type="button" class="btn secondary small" data-add="line" data-zone="monthly">+ Line</button>
@@ -190,7 +209,7 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
     </div>
 
     <div class="zone-h">Optional add-ons <span>— listed at the end of the quote, not counted in the totals</span></div>
-    <div class="lhead"><span></span><span>Item</span><span style="text-align:center">Qty</span><span>Our cost</span><span>Margin %</span><span>Total cost</span><span>Billing</span><span style="text-align:right">Line total</span><span></span></div>
+    <div class="lhead"><span></span><span>Item</span><span style="text-align:center">Qty</span><?= $canCosts ? '<span>Our cost</span><span>Margin %</span>' : '' ?><span>Total cost</span><span>Billing</span><span style="text-align:right">Line total</span><span></span></div>
     <div class="zone" id="zoneOpt" data-zone="optional"></div>
     <div class="row-actions" style="margin-top:.5rem">
       <button type="button" class="btn secondary small" data-add="line" data-zone="optional">+ Line</button>
@@ -204,7 +223,7 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
       <div class="stat" style="padding:.6rem 1rem"><span class="l">Recurring</span><div class="n" id="tMo" style="font-size:1.2rem;line-height:1.35">$0.00/mo</div></div>
       <div class="stat" style="padding:.6rem 1rem"><span class="l">Optional (not in totals)</span><div class="n" id="tOpt" style="font-size:1.2rem;line-height:1.35;color:var(--muted)">$0.00</div></div>
     </div>
-    <div style="display:flex;justify-content:flex-end;gap:1rem;margin-top:.6rem;flex-wrap:wrap;align-items:center">
+    <div style="display:<?= $canCosts ? 'flex' : 'none' ?>;justify-content:flex-end;gap:1rem;margin-top:.6rem;flex-wrap:wrap;align-items:center">
       <span class="muted" style="font-size:.78rem">Internal only, never shown to the customer:</span>
       <div class="stat" style="padding:.6rem 1rem"><span class="l">Our cost</span><div class="n" id="tCost" style="font-size:1.2rem;line-height:1.35;color:var(--muted)">$0.00</div></div>
       <div class="stat" style="padding:.6rem 1rem"><span class="l">Profit</span><div class="n" id="tProfit" style="font-size:1.2rem;line-height:1.35">$0.00</div></div>
@@ -236,7 +255,9 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
 
 <script>
   var CATALOG = <?= json_encode($catalog, JSON_UNESCAPED_SLASHES) ?>;
-  var INITIAL = <?= json_encode(array_map(function($r){return ['title'=>$r['title'],'desc'=>$r['description'],'qty'=>$r['quantity'],'price'=>$r['unit_price'],'cost'=>$r['unit_cost'] ?? null,'margin'=>$r['margin'] ?? null,'billing'=>$r['billing'],'section'=>(int)($r['is_section'] ?? 0),'optional'=>(int)($r['is_optional'] ?? 0)];}, $items), JSON_UNESCAPED_SLASHES) ?>;
+  // Cost and margin never reach the browser for people who can't see them.
+  var CAN_COSTS = <?= $canCosts ? 'true' : 'false' ?>;
+  var INITIAL = <?= json_encode(array_map(function($r) use ($canCosts){return ['title'=>$r['title'],'desc'=>$r['description'],'qty'=>$r['quantity'],'price'=>$r['unit_price'],'cost'=>$canCosts ? ($r['unit_cost'] ?? null) : null,'margin'=>$canCosts ? ($r['margin'] ?? null) : null,'billing'=>$r['billing'],'section'=>(int)($r['is_section'] ?? 0),'optional'=>(int)($r['is_optional'] ?? 0)];}, $items), JSON_UNESCAPED_SLASHES) ?>;
   var TAX_PRESETS = [
     {label:"Custom / none", rate:"", name:""},
     {label:"PA — 6%", rate:"6", name:"PA Sales Tax"},
@@ -283,7 +304,7 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
   tp.addEventListener('change',function(){var p=TAX_PRESETS[tp.value];if(p && p.rate!==''){document.getElementById('taxRate').value=p.rate;document.getElementById('taxLabel').value=p.name;recalc();}});
 
   var zoneOne = document.getElementById('zoneOne'), zoneRec = document.getElementById('zoneRec'), zoneOpt = document.getElementById('zoneOpt');
-  var COLS = 'grid-template-columns:auto 2fr .6fr .95fr .8fr .95fr 1.15fr .95fr auto';
+  var COLS = CAN_COSTS ? 'grid-template-columns:auto 2fr .6fr .95fr .8fr .95fr 1.15fr .95fr auto' : 'grid-template-columns:auto 2.4fr .6fr 1.1fr 1.2fr 1fr auto';
   document.querySelectorAll('.lhead').forEach(function(h){ h.style.cssText = 'display:grid;'+COLS+';gap:.4rem;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:.4rem 0 .2rem;border-bottom:1px solid var(--border)'; });
   function r2(n){return (Math.round(n*100)/100).toFixed(2);}
   function num(v){return v===null||v===undefined||String(v).trim()===''?'':String(parseFloat(v));}
@@ -336,8 +357,8 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
     row.innerHTML = MOVER +
       '<input name="item_title[]" placeholder="Title" value="'+esc(it.title)+'">'+
       '<input name="item_qty[]" type="number" min="0" step="1" value="'+(parseFloat(it.qty)||1)+'" style="text-align:center">'+
-      '<input name="item_cost[]" type="number" min="0" step="0.01" placeholder="Our cost" title="What this costs <?= e(client('name')) ?> (per unit, never shown to the customer)" value="'+esc(num(it.cost))+'">'+
-      '<input name="item_margin[]" type="number" step="0.1" placeholder="%" title="Margin % added on top of our cost" value="'+esc(num(it.margin))+'">'+
+      (CAN_COSTS ? '<input name="item_cost[]" type="number" min="0" step="0.01" placeholder="Our cost" title="What this costs <?= e(client('name')) ?> (per unit, never shown to the customer)" value="'+esc(num(it.cost))+'">'+
+      '<input name="item_margin[]" type="number" step="0.1" placeholder="%" title="Margin % added on top of our cost" value="'+esc(num(it.margin))+'">' : '<input type="hidden" name="item_cost[]" value=""><input type="hidden" name="item_margin[]" value="">')+
       '<input name="item_price[]" type="number" min="0" step="0.01" title="Total cost to the customer, per unit. Editing this updates the margin." value="'+(it.price||0)+'">'+
       '<select name="item_billing[]">'+Object.keys(PERIODS).map(function(k){return '<option value="'+k+'"'+((it.billing||'one_time')===k?' selected':'')+'>'+PERIODS[k][0]+'</option>';}).join('')+'</select>'+
       '<div class="lt" style="text-align:right;font-weight:600;font-size:.88rem;white-space:nowrap"></div>'+ X +

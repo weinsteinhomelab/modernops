@@ -1,6 +1,7 @@
 <?php
 /** Session + auth + CSRF + brute-force throttling. Included by every admin page. */
 require_once __DIR__ . '/_db.php';
+require_once __DIR__ . '/_users.php';
 
 // --- Security headers (sent before any output) ---
 if (!headers_sent()) {
@@ -32,6 +33,11 @@ function require_login(): void {
     if (!current_user()) { header('Location: login.php'); exit; }
     require_once __DIR__ . '/_migrate.php';
     maybe_migrate();
+    // Disabled or deleted people are signed out on their next click.
+    $m = me();
+    if (!$m || (isset($m['active']) && !(int)$m['active'])) { logout_user(); header('Location: login.php?disabled=1'); exit; }
+    // A temporary password from an admin has to be changed first.
+    if (!empty($m['must_change_pw']) && basename($_SERVER['SCRIPT_NAME'] ?? '') !== 'account.php') { header('Location: account.php?first=1'); exit; }
 }
 
 function login_user(array $user): void {

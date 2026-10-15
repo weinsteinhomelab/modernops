@@ -7,9 +7,14 @@ require_login();
 require_product('quotes');
 
 $id = (int)($_GET['id'] ?? 0);
-$st = db()->prepare('SELECT quote_number FROM quotes WHERE id = ?');
+require_perm('quotes.send');
+$st = db()->prepare('SELECT * FROM quotes WHERE id = ?');
 $st->execute([$id]);
-$num = $st->fetchColumn();
+$qrow = $st->fetch();
+if (!$qrow) { http_response_code(404); echo 'Quote not found.'; exit; }
+if (!can_see_quote($qrow)) deny('This quote belongs to someone else.');
+if (!quote_cleared($qrow) && !is_admin()) { header('Location: quote_view.php?id=' . $id . '&blocked=1'); exit; }
+$num = $qrow['quote_number'];
 $pdf = build_quote_pdf($id);
 if ($pdf === null) { http_response_code(404); echo 'Quote not found.'; exit; }
 

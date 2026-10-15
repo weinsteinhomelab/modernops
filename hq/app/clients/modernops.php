@@ -35,6 +35,8 @@ return [
         'quotes'    => true,             // Ops Quotes: Quotes + Catalog
         'inbox'     => true,             // Ops Inbox: Inbox tab
     ],
+    // Most people who can log in at once (each one is an Ops Customers seat). 0 = no limit.
+    'seats' => 0,
     // Modern Ops-only extra: link to the client preview hub (site_origin + /demos/)
     'previews' => true,
 

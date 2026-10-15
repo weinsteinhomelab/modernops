@@ -5,6 +5,7 @@ require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_verticals.php';
 require_login();
 require_product('customers', 'quotes');
+require_perm('customers.edit');
 
 $id = (int)($_GET['id'] ?? 0);
 $b = ['id'=>0,'name'=>'','vertical'=>'','main_phone'=>'','main_email'=>'','address'=>'','address2'=>'','city'=>'','state'=>'','country'=>'United States','zip'=>'','notes'=>''];
@@ -13,6 +14,7 @@ if ($id) {
     $st->execute([$id]);
     $found = $st->fetch();
     if ($found) $b = $found;
+    if ($found && !can_see_business($found)) deny('This customer isn' . "'" . 't assigned to you.');
 }
 
 $err = '';
@@ -30,11 +32,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $set = implode(',', array_map(fn($c) => "$c=?", $cols));
             $vals[] = $id;
             db()->prepare("UPDATE businesses SET $set WHERE id=?")->execute($vals);
+            log_activity('customer.updated', 'customer', $id, $b['name']);
             header('Location: customer.php?id=' . $id . '&saved=1'); exit;
         } else {
             $ph = implode(',', array_fill(0, count($cols), '?'));
-            db()->prepare("INSERT INTO businesses (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
-            header('Location: customer.php?id=' . (int)db()->lastInsertId() . '&saved=1'); exit;
+            // New customers belong to whoever adds them (admins can reassign on the customer page).
+            db()->prepare("INSERT INTO businesses (" . implode(',', $cols) . ", assigned_to) VALUES ($ph, ?)")->execute(array_merge($vals, [me_id()]));
+            $newId = (int)db()->lastInsertId();
+            log_activity('customer.created', 'customer', $newId, $b['name']);
+            header('Location: customer.php?id=' . $newId . '&saved=1'); exit;
         }
     }
 }

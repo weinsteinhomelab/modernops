@@ -18,17 +18,25 @@ $st = db()->prepare(
 $st->execute([$id]);
 $q = $st->fetch();
 if (!$q) { http_response_code(404); layout_header('Not found','quotes.php'); echo '<div class="card">Quote not found.</div>'; layout_footer(); exit; }
+if (!can_see_quote($q)) deny('This quote belongs to someone else.');
 
 $flash = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
     $a = $_POST['action'] ?? '';
     if ($a === 'delete') {
+        // Users can delete their own drafts; admins can delete anything.
+        if (!is_admin() && $q['status'] !== 'draft') deny('Only drafts can be deleted. Ask an admin to remove this quote.');
         db()->prepare('DELETE FROM quote_items WHERE quote_id=?')->execute([$id]);
         db()->prepare('DELETE FROM quotes WHERE id=?')->execute([$id]);
+        db()->prepare("UPDATE approvals SET status='withdrawn', decided_at=NOW(), decision_note='Quote deleted' WHERE quote_id=? AND status='pending'")->execute([$id]);
+        log_activity('quote.deleted', 'quote', 0, 'Quote #' . $q['quote_number']);
         header('Location: quotes.php'); exit;
     } elseif ($a === 'make_link') {
+        if (!can('quotes.send')) deny();
+        if (!quote_cleared($q) && !is_admin()) { header('Location: quote_view.php?id=' . $id . '&blocked=1'); exit; }
         quote_accept_url($id);
+        log_activity('quote.link', 'quote', $id, 'Quote #' . $q['quote_number']);
         header('Location: quote_view.php?id=' . $id); exit;
     } elseif ($a === 'status') {
         $s = $_POST['status'] ?? 'draft';
@@ -36,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             db()->prepare('UPDATE quotes SET status=? WHERE id=?')->execute([$s, $id]);
             $q['status'] = $s;
             $flash = 'Status updated.';
+            log_activity('quote.status', 'quote', $id, 'Quote #' . $q['quote_number'] . ' → ' . $s);
         }
     }
 }
@@ -73,9 +82,10 @@ layout_header('Quote ' . $q['quote_number'], 'quotes.php');
     <p class="sub">For <?= e($bizName) ?><?= $preparedFor ? ' · ' . e($preparedFor) : '' ?></p>
   </div>
   <div class="row-actions">
-    <a href="quote_edit.php?id=<?= $id ?>" class="btn secondary">Edit</a>
-    <a href="quote_pdf.php?id=<?= $id ?>" class="btn secondary" target="_blank">Download PDF</a>
-    <?php if ($toEmail): ?>
+    <?php if (can('quotes.create')): ?><a href="quote_edit.php?id=<?= $id ?>" class="btn secondary">Edit</a><?php endif; ?>
+    <?php $cleared = quote_cleared($q) || is_admin(); ?>
+    <?php if (can('quotes.send') && $cleared): ?><a href="quote_pdf.php?id=<?= $id ?>" class="btn secondary" target="_blank">Download PDF</a><?php endif; ?>
+    <?php if ($toEmail && can('quotes.send') && $cleared): ?>
       <form method="post" action="quote_send.php" onsubmit="return confirm('Email this quote to <?= e($toEmail) ?>?')" style="display:inline">
         <?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>">
         <button class="btn">Email to customer</button>
@@ -87,6 +97,32 @@ layout_header('Quote ' . $q['quote_number'], 'quotes.php');
 <?php if (isset($_GET['sent'])) flash('ok','Quote emailed to the customer.'); ?>
 <?php if (isset($_GET['mailerr'])) flash('err','Could not send the email. Check SMTP settings, or download the PDF and send it manually.'); ?>
 <?php if ($flash) flash('ok', $flash); ?>
+<?php if (isset($_GET['blocked'])) flash('err', 'This quote can\'t go to the customer until an admin approves its pricing.'); ?>
+<?php
+// Approval state for pricing that differs from the pricebook
+$appr = null;
+if (in_array($q['approval_status'] ?? 'none', ['pending', 'rejected', 'approved'], true)) {
+    $as = db()->prepare("SELECT a.*, COALESCE(NULLIF(d.name,''), d.username) AS decider FROM approvals a LEFT JOIN admin_users d ON d.id = a.decided_by
+                         WHERE a.quote_id = ? AND a.status <> 'withdrawn' ORDER BY a.id DESC LIMIT 1");
+    $as->execute([$id]);
+    $appr = $as->fetch() ?: null;
+}
+$apprDiffs = $appr ? (array)(json_decode((string)$appr['payload'], true)['diffs'] ?? []) : [];
+?>
+<?php if (($q['approval_status'] ?? '') === 'pending'): ?>
+  <div class="card" style="border-color:#e0b84c;background:color-mix(in srgb,#e0b84c 10%,var(--surface))">
+    <strong>Waiting for admin approval.</strong> Some pricing differs from the pricebook, so this quote can't be emailed or shared yet<?= is_admin() ? '' : '. You\'ll get an email when it\'s decided' ?>.
+    <?php if ($apprDiffs): ?><ul style="margin:.4rem 0 0 1.2rem;font-size:.9rem"><?php foreach ($apprDiffs as $d): ?><li><?= e($d) ?></li><?php endforeach; ?></ul><?php endif; ?>
+    <?php if (is_admin()): ?><div style="margin-top:.6rem"><a class="btn small" href="approvals.php">Review in Approvals</a></div><?php endif; ?>
+  </div>
+<?php elseif (($q['approval_status'] ?? '') === 'rejected'): ?>
+  <div class="card" style="border-color:#f0cccc;background:color-mix(in srgb,#b02424 7%,var(--surface))">
+    <strong>Pricing was turned down<?= $appr && $appr['decider'] ? ' by ' . e($appr['decider']) : '' ?>.</strong>
+    <?= $appr && $appr['decision_note'] ? 'Note: ' . e($appr['decision_note']) . '. ' : '' ?>Edit the quote to change the pricing; saving sends it back for approval.
+  </div>
+<?php elseif (($q['approval_status'] ?? '') === 'approved' && $appr): ?>
+  <div class="muted" style="font-size:.85rem;margin:-.4rem 0 1rem">Pricing approved<?= $appr['decider'] ? ' by ' . e($appr['decider']) : '' ?><?= $appr['decided_at'] ? ' on ' . e(date('M j', strtotime($appr['decided_at']))) : '' ?>.</div>
+<?php endif; ?>
 
 <div class="card" style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap">
   <form method="post" style="display:flex;gap:.5rem;align-items:center">
@@ -97,16 +133,18 @@ layout_header('Quote ' . $q['quote_number'], 'quotes.php');
     </select>
   </form>
   <?php if ($toEmail): ?><span class="muted" style="font-size:.85rem">· Emails to: <?= e($toEmail) ?></span><?php else: ?><span class="muted" style="font-size:.85rem">· No email on file — add a contact email or the business main email to enable emailing.</span><?php endif; ?>
+  <?php if (is_admin() || $q['status'] === 'draft'): ?>
   <form method="post" onsubmit="return confirm('Delete this quote permanently?')" style="margin-left:auto">
     <?= csrf_field() ?><input type="hidden" name="action" value="delete"><button class="btn danger small">Delete quote</button>
   </form>
+  <?php endif; ?>
 </div>
 
 <?php
 // Internal profit summary (only for lines where our cost was entered); never on the customer copy.
 $costed = array_filter($items, fn($i) => $i['unit_cost'] !== null && empty($i['is_section']));
 $lineCount = count(array_filter($items, fn($i) => empty($i['is_section'])));
-if ($costed):
+if ($costed && can('quotes.costs')):
     $byP = [];
     foreach ($costed as $r) { $k = billing_clean($r['billing']); $byP[$k][0] = ($byP[$k][0] ?? 0) + (float)$r['quantity'] * (float)$r['unit_cost']; $byP[$k][1] = ($byP[$k][1] ?? 0) + (float)$r['quantity'] * (float)$r['unit_price']; }
     uksort($byP, fn($a, $b) => array_search($a, array_keys(billing_periods())) <=> array_search($b, array_keys(billing_periods())));
@@ -122,7 +160,7 @@ if ($costed):
 
 <?php
 // Customer link + online acceptance
-$acceptOn = trim((string) client('quotes.accept_page', '')) !== '';
+$acceptOn = trim((string) client('quotes.accept_page', '')) !== '' && can('quotes.send');
 $link = ($acceptOn && !empty($q['public_token'])) ? quote_accept_url($id) : '';
 $chosen = [];
 if (!empty($q['accepted_optional'])) {

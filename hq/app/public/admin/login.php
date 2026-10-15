@@ -15,6 +15,7 @@ if (current_user()) { header('Location: index.php'); exit; }
 
 $err = '';
 $ip = client_ip();
+if (isset($_GET['disabled'])) $err = 'Your account is turned off. Ask an admin if you need access.';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
@@ -27,18 +28,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $st = db()->prepare('SELECT * FROM admin_users WHERE username = ?');
         $st->execute([$user]);
         $row = $st->fetch();
-        if ($row && password_verify($pass, $row['password_hash'])) {
+        if ($row && password_verify($pass, $row['password_hash']) && (!array_key_exists('active', $row) || (int)$row['active'] === 1)) {
             record_attempt($ip, $user, true);
             login_user($row);
+            try { db()->prepare('UPDATE admin_users SET last_login_at = NOW() WHERE id = ?')->execute([(int)$row['id']]); } catch (Exception $ex) {}
+            log_activity('login', 'user', (int)$row['id']);
             header('Location: index.php');
             exit;
         }
         record_attempt($ip, $user, false);
         usleep(400000); // uniform small delay to blunt guessing
         [$nowLocked, $nowWait] = throttle_status($ip);
+        $offButRight = $row && isset($row['active']) && (int)$row['active'] === 0 && password_verify($pass, $row['password_hash']);
         $err = $nowLocked
             ? 'Too many failed attempts. Please try again in ' . fmt_wait($nowWait) . '.'
-            : 'Incorrect username or password.';
+            : ($offButRight ? 'Your account is turned off. Ask an admin if you need access.' : 'Incorrect username or password.');
     }
 }
 ?><!DOCTYPE html>

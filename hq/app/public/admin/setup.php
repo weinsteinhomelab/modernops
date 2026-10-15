@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($stmt !== '') db()->exec($stmt);
             }
             // Create admin
-            $st = db()->prepare('INSERT INTO admin_users (username, password_hash) VALUES (?, ?)');
+            $st = db()->prepare("INSERT INTO admin_users (username, password_hash, role) VALUES (?, ?, 'admin')");
             $st->execute([$user, password_hash($pass, PASSWORD_DEFAULT)]);
             // Seed catalog + defaults and mark schema current
             require_once __DIR__ . '/_migrate.php';

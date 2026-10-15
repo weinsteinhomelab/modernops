@@ -8,6 +8,7 @@
 require_once __DIR__ . '/../admin/_db.php';
 require_once __DIR__ . '/../admin/_mail.php';
 require_once __DIR__ . '/../admin/_quote_render.php';
+require_once __DIR__ . '/../admin/_users.php';
 
 // --- CORS: the client's website (apex + www) and the accept page's own origin ---
 $allowed = [];
@@ -79,6 +80,7 @@ if ($method !== 'POST') out(405, ['ok' => false, 'error' => 'method']);
 if (!empty($q['accepted_at'])) out(409, ['ok' => false, 'error' => 'This quote has already been accepted.']);
 if ($q['status'] === 'declined') out(409, ['ok' => false, 'error' => 'This quote is no longer open. Please contact us.']);
 if ($expired) out(409, ['ok' => false, 'error' => 'This quote has expired. Please contact us for an updated quote.']);
+if (in_array($q['approval_status'] ?? 'none', ['pending', 'rejected'], true)) out(409, ['ok' => false, 'error' => 'This quote is being updated. Please check back soon or contact us.']);
 $name = trim(preg_replace('/\s+/', ' ', (string) ($in['name'] ?? '')));
 if (mb_strlen($name) < 2 || mb_strlen($name) > 160) out(422, ['ok' => false, 'error' => 'Please type your full name to sign.']);
 if ((int) $q['terms_included'] === 1 && empty($in['agree'])) out(422, ['ok' => false, 'error' => 'Please tick the box to agree to the terms.']);
@@ -102,6 +104,9 @@ $body = "Quote #{$q['quote_number']} for {$q['c_business']} was accepted online.
       . ($titles ? "Optional add-ons they chose:\n- " . implode("\n- ", $titles) . "\n" : '')
       . "\nIP: $ip\n";
 try { send_mail(NOTIFY_EMAIL, "Quote #{$q['quote_number']} accepted by $name", $body); } catch (Throwable $e) {}
+// The person who made the quote hears about it too (if they have an email on file).
+if (!empty($q['created_by'])) notify_user((int)$q['created_by'], "Quote #{$q['quote_number']} accepted by $name", $body);
+try { db()->prepare("INSERT INTO activity (user_id, action, entity, entity_id, detail) VALUES (NULL, 'quote.accepted', 'quote', ?, ?)")->execute([$id, 'Quote #' . $q['quote_number'] . ' by ' . $name]); } catch (Throwable $e) {}
 
 [$q] = quote_load($id);
 out(200, ['ok' => true, 'accepted' => ['name' => $q['accepted_name'], 'at' => date('F j, Y \a\t g:ia', strtotime($q['accepted_at']))]]);

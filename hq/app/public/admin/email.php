@@ -15,7 +15,8 @@ if (!imap_ready()) {
     exit;
 }
 
-$accounts = imap_accounts();
+$accounts = my_mailboxes();   // admins: all; users: the ones an admin gave them
+if (!$accounts) deny('No mailboxes have been shared with you yet.');
 $ai = (int)($_GET['acct'] ?? 0);
 if ($ai < 0 || $ai >= count($accounts)) $ai = 0;
 $account = $accounts[$ai];
