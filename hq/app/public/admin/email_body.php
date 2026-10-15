@@ -16,7 +16,8 @@ header('Content-Type: text/html; charset=UTF-8');
 header('Cache-Control: private, no-store');
 
 if (!imap_ready()) { http_response_code(503); exit; }
-$accounts = imap_accounts();
+$accounts = my_mailboxes();   // admins: all; users: the ones an admin gave them
+if (!$accounts) deny('No mailboxes have been shared with you yet.');
 $ai = (int)($_GET['acct'] ?? 0);
 if ($ai < 0 || $ai >= count($accounts)) $ai = 0;
 

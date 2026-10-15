@@ -5,8 +5,9 @@ require_once __DIR__ . '/_brand.php';
 function layout_header(string $title, string $active = ''): void {
     // Nav follows the products this client has; the title attribute names the product.
     $nav = ['index.php' => ['Dashboard', '']];
+    $who = me();   // null on setup/login pages
     if (product_on('customers')) {
-        $nav['requests.php']  = ['Requests', product_name('customers')];
+        if (!$who || can('requests.view')) $nav['requests.php'] = ['Requests', product_name('customers')];
         $nav['customers.php'] = ['Customers', product_name('customers')];
     }
     if (product_on('quotes')) {
@@ -15,8 +16,15 @@ function layout_header(string $title, string $active = ''): void {
         $nav['quotes.php']  = ['Quotes', product_name('quotes')];
         $nav['catalog.php'] = ['Catalog', product_name('quotes')];
     }
-    if (product_on('inbox')) $nav['email.php'] = ['Inbox', product_name('inbox')];
+    if (product_on('inbox') && (!$who || my_mailboxes())) $nav['email.php'] = ['Inbox', product_name('inbox')];
     if (client('previews')) $nav[rtrim(SITE_ORIGIN, '/') . '/demos/'] = ['Previews', ''];
+    // Admin-only pages
+    if ($who && is_admin()) {
+        $pending = pending_approvals();
+        $nav['approvals.php'] = ['Approvals' . ($pending ? ' <span class="navcount">' . $pending . '</span>' : ''), 'Pricebook and pricing changes waiting for you'];
+        $nav['users.php'] = ['People', 'Users, admins and what they can do'];
+        $nav['activity.php'] = ['Activity', 'Who did what'];
+    }
     $accent = brand_color('accent', '#1a6b4a');
     $accentDark = brand_color('accent_dark', '#35b082');
     $tint = brand_color('tint', '#e8f4ee');
@@ -53,6 +61,7 @@ function layout_header(string $title, string $active = ''): void {
   nav.main a{color:var(--topbar-dim);padding:.5rem .9rem;border-radius:6px;font-size:.9rem;font-weight:500}
   nav.main a:hover{background:rgba(255,255,255,.08);color:#fff;text-decoration:none}
   nav.main a.active{background:var(--accent);color:var(--accent-text)}
+  .navcount{display:inline-block;min-width:1.2em;padding:0 .35em;border-radius:9px;background:#d9534f;color:#fff;font-size:.72rem;font-weight:700;line-height:1.5;text-align:center}
   .topbar-right{display:flex;align-items:center;gap:1rem;font-size:.85rem;color:var(--topbar-dim)}
   .themebtn{background:transparent;border:1px solid rgba(255,255,255,.2);color:var(--topbar-text);width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center}
   .wrap{padding:1.75rem 2.5rem 4rem}
@@ -110,7 +119,7 @@ function layout_header(string $title, string $active = ''): void {
   </div>
   <div class="topbar-right">
     <button class="themebtn" id="themebtn" type="button" aria-label="Toggle theme">◐</button>
-    <span class="uname"><?= e(current_username()) ?></span>
+    <a class="uname" href="account.php" style="color:var(--topbar-dim)" title="Your account"><?= e($who ? user_label($who) : current_username()) ?><?= ($who && is_admin()) ? ' <span style="opacity:.6;font-size:.75em">(admin)</span>' : '' ?></a>
     <a href="logout.php" style="color:var(--topbar-dim)">Log out</a>
   </div>
 </header>

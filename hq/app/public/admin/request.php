@@ -4,6 +4,7 @@ require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
 require_login();
 require_product('customers');
+require_perm('requests.view');
 
 $id = (int)($_GET['id'] ?? 0);
 $st = db()->prepare('SELECT * FROM requests WHERE id = ?');
@@ -25,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msg = 'Status updated.';
         }
     } elseif ($action === 'delete') {
+        if (!is_admin()) deny('Only admins can delete requests.');
         db()->prepare('DELETE FROM requests WHERE id = ?')->execute([$id]);
         header('Location: requests.php');
         exit;
@@ -38,14 +40,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (!$bid) {
             $bname = trim((string)($r['business'] ?: $r['name'])) ?: 'New customer';
-            $ins = db()->prepare('INSERT INTO businesses (name, main_email, main_phone) VALUES (?,?,?)');
-            $ins->execute([$bname, $r['email'], $r['phone']]);
+            // The new customer belongs to whoever turns the request into one.
+            $ins = db()->prepare('INSERT INTO businesses (name, main_email, main_phone, assigned_to) VALUES (?,?,?,?)');
+            $ins->execute([$bname, $r['email'], $r['phone'], me_id()]);
             $bid = (int) db()->lastInsertId();
             $parts = preg_split('/\s+/', trim((string)$r['name']), 2);
             db()->prepare('INSERT INTO contacts (business_id, first_name, last_name, email, phone) VALUES (?,?,?,?,?)')
                ->execute([$bid, $parts[0] ?? '', $parts[1] ?? '', $r['email'], $r['phone']]);
         }
         db()->prepare('UPDATE requests SET business_id = ? WHERE id = ?')->execute([$bid, $id]);
+        // An existing customer nobody looks after goes to this person too.
+        db()->prepare('UPDATE businesses SET assigned_to = ? WHERE id = ? AND assigned_to IS NULL')->execute([me_id(), $bid]);
+        log_activity('request.converted', 'customer', (int)$bid, (string)($r['business'] ?: $r['name']));
+        $owner = db()->prepare('SELECT assigned_to FROM businesses WHERE id = ?'); $owner->execute([$bid]);
+        if (!is_admin() && (int)$owner->fetchColumn() !== me_id()) { header('Location: request.php?id=' . $id . '&owned=1'); exit; }
         header('Location: customer.php?id=' . (int)$bid . '&from=request');
         exit;
     }
@@ -65,6 +73,7 @@ layout_header('Request', 'requests.php');
 <h1 class="page"><?= e($r['name']) ?></h1>
 <p class="sub"><?= e(date('l, M j, Y \a\t g:ia', strtotime($r['created_at']))) ?> · <?= e(ucfirst($r['type'])) ?> request</p>
 <?php if ($msg) flash('ok', $msg); ?>
+<?php if (isset($_GET['owned'])) flash('err', 'This request matches a customer someone else looks after. It' . "'" . 's linked to them; ask an admin if it should be yours.'); ?>
 
 <div class="grid2">
   <div class="card">

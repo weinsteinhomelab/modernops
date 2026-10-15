@@ -4,35 +4,43 @@ require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
 require_login();
 
-$count = function (string $sql): int {
-    try { return (int) db()->query($sql)->fetchColumn(); } catch (Exception $ex) { return 0; }
+$count = function (string $sql, array $args = []): int {
+    try { $st = db()->prepare($sql); $st->execute($args); return (int) $st->fetchColumn(); } catch (Exception $ex) { return 0; }
 };
+// Users only count what they can see: their customers and their quotes.
+[$bs, $ba] = biz_scope('b');
+[$qs, $qa] = quote_scope('q');
+$seeRequests = product_on('customers') && can('requests.view');
 
 $groups = [];
+if (is_admin()) {
+    $pend = pending_approvals();
+    if ($pend) $groups['admin'] = [['Waiting for approval', $pend, 'approvals.php']];
+}
 if (product_on('customers')) {
-    $groups['customers'] = [
-        ['New requests', $count("SELECT COUNT(*) FROM requests WHERE status='new'"), 'requests.php'],
-        ['Customers', $count("SELECT COUNT(*) FROM businesses"), 'customers.php'],
-        ['Total requests', $count("SELECT COUNT(*) FROM requests"), 'requests.php'],
-    ];
+    $groups['customers'] = array_values(array_filter([
+        $seeRequests ? ['New requests', $count("SELECT COUNT(*) FROM requests WHERE status='new'"), 'requests.php'] : null,
+        [is_admin() ? 'Customers' : 'Your customers', $count("SELECT COUNT(*) FROM businesses b WHERE $bs", $ba), 'customers.php'],
+        $seeRequests ? ['Total requests', $count("SELECT COUNT(*) FROM requests"), 'requests.php'] : null,
+    ]));
 }
 if (product_on('quotes')) {
     $groups['quotes'] = [
-        ['Open quotes', $count("SELECT COUNT(*) FROM quotes WHERE status IN ('draft','sent')"), 'quotes.php'],
-        ['Accepted', $count("SELECT COUNT(*) FROM quotes WHERE status='accepted'"), 'quotes.php'],
-        ['Saved items', $count("SELECT COUNT(*) FROM catalog_items WHERE active=1"), 'catalog.php'],
+        [is_admin() ? 'Open quotes' : 'Your open quotes', $count("SELECT COUNT(*) FROM quotes q WHERE q.status IN ('draft','sent') AND $qs", $qa), 'quotes.php'],
+        ['Accepted', $count("SELECT COUNT(*) FROM quotes q WHERE q.status='accepted' AND $qs", $qa), 'quotes.php'],
+        [is_admin() ? 'Saved items' : 'Needs approval', is_admin() ? $count("SELECT COUNT(*) FROM catalog_items WHERE active=1") : $count("SELECT COUNT(*) FROM quotes q WHERE q.approval_status='pending' AND $qs", $qa), is_admin() ? 'catalog.php' : 'quotes.php'],
     ];
 }
 
-$recent = product_on('customers') ? db()->query("SELECT * FROM requests ORDER BY created_at DESC LIMIT 8")->fetchAll() : [];
+$recent = $seeRequests ? db()->query("SELECT * FROM requests ORDER BY created_at DESC LIMIT 8")->fetchAll() : [];
 
 layout_header('Dashboard', 'index.php');
 ?>
 <h1 class="page">Dashboard</h1>
-<p class="sub">Welcome back, <?= e(current_username()) ?>.</p>
+<p class="sub">Welcome back, <?= e(user_label(me() ?? ['username' => current_username()])) ?>.</p>
 
 <?php foreach ($groups as $p => $stats): ?>
-  <div class="muted" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:0 0 .5rem"><?= e(product_name($p)) ?></div>
+  <div class="muted" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:0 0 .5rem"><?= $p === 'admin' ? 'Admin' : e(product_name($p)) ?></div>
   <div class="stat-row">
     <?php foreach ($stats as [$label, $n, $href]): ?>
       <a class="stat" href="<?= e($href) ?>" style="text-decoration:none;color:inherit"><div class="n"><?= $n ?></div><div class="l"><?= e($label) ?></div></a>
@@ -40,15 +48,15 @@ layout_header('Dashboard', 'index.php');
   </div>
 <?php endforeach; ?>
 
-<?php if (product_on('inbox')): ?>
+<?php if (product_on('inbox') && my_mailboxes()): ?>
   <div class="muted" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:0 0 .5rem"><?= e(product_name('inbox')) ?></div>
   <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap">
-    <span><?= count(imap_accounts_list()) ?> mailbox<?= count(imap_accounts_list()) === 1 ? '' : 'es' ?> connected</span>
+    <span><?= count(my_mailboxes()) ?> mailbox<?= count(my_mailboxes()) === 1 ? '' : 'es' ?> <?= is_admin() ? 'connected' : 'shared with you' ?></span>
     <a href="email.php" class="btn secondary small">Open Inbox</a>
   </div>
 <?php endif; ?>
 
-<?php if (product_on('customers')): ?>
+<?php if ($seeRequests): ?>
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
     <strong>Latest requests</strong>

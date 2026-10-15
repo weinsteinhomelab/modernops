@@ -186,6 +186,48 @@ admin_users, login_attempts   (login)
 
 ---
 
+## 5a. People, permissions and approvals
+
+Code: `_users.php`. Pages: People (`users.php`, `user_edit.php`), Approvals (`approvals.php`),
+Activity (`activity.php`), Your account (`account.php`). The admin pages are admin-only.
+
+**Roles**
+- **Admin:** sees and does everything, manages people, approves requests. There must
+  always be at least one active admin; you can't turn off or demote yourself.
+- **User:** sees only the customers assigned to them (`businesses.assigned_to`) and the
+  quotes they made (`quotes.created_by`), plus whatever permissions an admin ticks.
+
+**Permissions** (`user_permissions`, keys from `perm_list()`):
+
+| Key | What it allows | New users |
+|---|---|---|
+| `customers.edit` | Add customers (assigned to themselves), edit their customers, contacts, history | on |
+| `requests.view` | See website requests; converting one assigns the customer to them | off |
+| `quotes.create` | Build and edit their quotes | on |
+| `quotes.send` | Email quotes, download PDFs, share the customer link | on |
+| `quotes.costs` | See cost, margin and profit (otherwise never sent to their browser) | off |
+| `pricing.free` | Skip the approval queue for pricebook and pricing changes | off |
+
+**Inbox:** `user_mailboxes` lists which mailboxes each user may open; admins see all.
+Quotes always go out from `email.quote_from`, whoever sends them.
+
+**Seats:** `seats` in the client file caps how many people can be active (0 = no limit).
+
+**Approvals** (`approvals` table, `quote_pricing_changes()` / `quote_after_save()`):
+- A user adding or changing a pricebook item creates a `catalog_add` / `catalog_edit`
+  request instead of changing the Catalog. Approving applies it.
+- When a user saves a quote, every line is compared with the pricebook (same title,
+  same price, same billing period). Any difference, or a line not in the pricebook,
+  sets `quotes.approval_status = 'pending'` with a hash of those lines and opens a
+  `quote_pricing` request. Until it's approved the quote can't be emailed, downloaded
+  or accepted online. Saving again with the same lines keeps the decision; changing
+  them asks again. Admins and `pricing.free` users skip all of this.
+- Admins with an email get notified of new requests; the requester is emailed the decision.
+
+**Checking access in a page:** `require_admin()`, `require_perm('quotes.send')`,
+`can_see_business($row)`, `can_see_quote($row)`, and `biz_scope()` / `quote_scope()`
+for list queries. `log_activity()` records anything worth seeing later.
+
 ## 6. Client config: one file per client
 
 The code is identical for every client. Two things change:
@@ -211,6 +253,7 @@ The code is identical for every client. Two things change:
 | `quotes.next_steps`, `quotes.payment` | The NEXT STEPS section on every quote |
 | `logo_file` | PNG/JPG (inside `hq/app`) printed on quotes and PDFs |
 | `timezone` | Time zone for every date HQ shows or saves |
+| `seats` | Most people who can be active at once (Ops Customers is per seat); 0 = no limit |
 | `catalog` | Starting pricebook, used once to fill an empty Catalog |
 
 Read values with `client('quotes.tax_rate')`. Never hard-code a client's name,
@@ -344,6 +387,10 @@ Run through this before any change goes to our copy or a client's.
 - [ ] Logged in and opened every page in the nav: no errors, no PHP warnings.
 - [ ] Tried it with the products switched off: pages for those products
       show "isn't part of this account", and they're gone from the nav and dashboard.
+
+**People**
+- [ ] Tried it as a user without each permission: pages refuse, lists only show their own records.
+- [ ] Anything that changes prices or the pricebook still goes through approvals for users.
 
 **Client values**
 - [ ] No client name, domain, color, email or price typed into code. Search the diff

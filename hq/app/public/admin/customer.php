@@ -11,12 +11,22 @@ $st = db()->prepare('SELECT * FROM businesses WHERE id = ?');
 $st->execute([$id]);
 $b = $st->fetch();
 if (!$b) { http_response_code(404); layout_header('Not found','customers.php'); echo '<div class="card">Business not found. <a href="customers.php">Back</a></div>'; layout_footer(); exit; }
+if (!can_see_business($b)) deny('This customer isn' . "'" . 't assigned to you.');
 
 $msg = '';
 $siteErr = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
     $a = $_POST['action'] ?? '';
+    if ($a === 'assign') {
+        if (!is_admin()) deny();
+        $to = (int)($_POST['assigned_to'] ?? 0) ?: null;
+        db()->prepare('UPDATE businesses SET assigned_to = ? WHERE id = ?')->execute([$to, $id]);
+        $b['assigned_to'] = $to;
+        log_activity('customer.assigned', 'customer', $id, $b['name'] . ' to ' . ($to ? (string)(array_column(people(), null, 'id')[$to]['username'] ?? $to) : 'nobody'));
+        header('Location: customer.php?id=' . $id . '&saved=1'); exit;
+    }
+    if (!can('customers.edit')) deny('You can view this customer but not change it.');
     if ($a === 'add_tp') {
         $d = $_POST['tp_date'] ?: date('Y-m-d');
         $t = $_POST['tp_type'] ?? 'Call';
@@ -52,7 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $contacts = db()->prepare('SELECT * FROM contacts WHERE business_id=? ORDER BY id'); $contacts->execute([$id]); $contacts = $contacts->fetchAll();
 $tps = db()->prepare('SELECT * FROM touchpoints WHERE business_id=? ORDER BY tp_date DESC, id DESC'); $tps->execute([$id]); $tps = $tps->fetchAll();
-$quotes = db()->prepare('SELECT * FROM quotes WHERE business_id=? ORDER BY created_at DESC'); $quotes->execute([$id]); $quotes = $quotes->fetchAll();
+[$qs, $qa] = quote_scope('q');
+$quotes = db()->prepare("SELECT q.* FROM quotes q WHERE q.business_id=? AND $qs ORDER BY q.created_at DESC"); $quotes->execute(array_merge([$id], $qa)); $quotes = $quotes->fetchAll();
 $reqs = db()->prepare('SELECT * FROM requests WHERE business_id=? ORDER BY created_at DESC'); $reqs->execute([$id]); $reqs = $reqs->fetchAll();
 $sites = sites_for($id);
 $demoUrls = demo_suggestions();
@@ -68,10 +79,21 @@ layout_header($b['name'], 'customers.php');
     <p class="sub">Customer since <?= e(date('M Y', strtotime($b['created_at']))) ?></p>
   </div>
   <div class="row-actions">
-    <a href="customer_edit.php?id=<?= $id ?>" class="btn secondary">Edit business</a>
-    <a href="quote_edit.php?business=<?= $id ?>" class="btn">+ New quote</a>
+    <?php if (can('customers.edit')): ?><a href="customer_edit.php?id=<?= $id ?>" class="btn secondary">Edit business</a><?php endif; ?>
+    <?php if (product_on('quotes') && can('quotes.create')): ?><a href="quote_edit.php?business=<?= $id ?>" class="btn">+ New quote</a><?php endif; ?>
   </div>
 </div>
+<?php if (is_admin()): ?>
+<form method="post" class="card" style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:.7rem 1.1rem">
+  <?= csrf_field() ?><input type="hidden" name="action" value="assign">
+  <span class="muted" style="font-size:.85rem">Looked after by</span>
+  <select name="assigned_to" onchange="this.form.submit()" style="max-width:260px">
+    <option value="">Nobody (admins only)</option>
+    <?php foreach (people() as $p): ?><option value="<?= (int)$p['id'] ?>"<?= (int)$b['assigned_to'] === (int)$p['id'] ? ' selected' : '' ?>><?= e(user_label($p)) ?><?= $p['role'] === 'admin' ? ' (admin)' : '' ?></option><?php endforeach; ?>
+  </select>
+  <span class="muted" style="font-size:.8rem">The person you pick sees this customer and can quote it.</span>
+</form>
+<?php endif; ?>
 <?php if (isset($_GET['from']) && $_GET['from']==='request') flash('ok','Business created from the request.'); ?>
 <?php if (isset($_GET['saved'])) flash('ok','Saved.'); ?>
 <?php if ($msg) flash('ok', $msg); ?>

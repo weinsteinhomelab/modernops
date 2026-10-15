@@ -4,6 +4,7 @@ require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
 require_login();
 require_product('customers', 'quotes');
+require_perm('customers.edit');
 
 $id = (int)($_GET['id'] ?? 0);
 $businessId = (int)($_GET['business'] ?? 0);
@@ -17,8 +18,9 @@ if ($id) {
 }
 
 // Confirm the business exists
-$bst = db()->prepare('SELECT id, name FROM businesses WHERE id=?'); $bst->execute([$businessId]); $biz = $bst->fetch();
+$bst = db()->prepare('SELECT id, name, assigned_to FROM businesses WHERE id=?'); $bst->execute([$businessId]); $biz = $bst->fetch();
 if (!$biz) { http_response_code(404); layout_header('Not found','customers.php'); echo '<div class="card">Business not found.</div>'; layout_footer(); exit; }
+if (!can_see_business($biz)) deny('This customer isn' . "'" . 't assigned to you.');
 
 $err = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
