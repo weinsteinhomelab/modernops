@@ -110,13 +110,13 @@ if (in_array($q['approval_status'] ?? 'none', ['pending', 'rejected', 'approved'
 $apprDiffs = $appr ? (array)(json_decode((string)$appr['payload'], true)['diffs'] ?? []) : [];
 ?>
 <?php if (($q['approval_status'] ?? '') === 'pending'): ?>
-  <div class="card" style="border-color:#e0b84c;background:color-mix(in srgb,#e0b84c 10%,var(--surface))">
+  <div class="notice">
     <strong>Waiting for admin approval.</strong> Some pricing differs from the pricebook, so this quote can't be emailed or shared yet<?= is_admin() ? '' : '. You\'ll get an email when it\'s decided' ?>.
     <?php if ($apprDiffs): ?><ul style="margin:.4rem 0 0 1.2rem;font-size:.9rem"><?php foreach ($apprDiffs as $d): ?><li><?= e($d) ?></li><?php endforeach; ?></ul><?php endif; ?>
     <?php if (is_admin()): ?><div style="margin-top:.6rem"><a class="btn small" href="approvals.php">Review in Approvals</a></div><?php endif; ?>
   </div>
 <?php elseif (($q['approval_status'] ?? '') === 'rejected'): ?>
-  <div class="card" style="border-color:#f0cccc;background:color-mix(in srgb,#b02424 7%,var(--surface))">
+  <div class="notice err">
     <strong>Pricing was turned down<?= $appr && $appr['decider'] ? ' by ' . e($appr['decider']) : '' ?>.</strong>
     <?= $appr && $appr['decision_note'] ? 'Note: ' . e($appr['decision_note']) . '. ' : '' ?>Edit the quote to change the pricing; saving sends it back for approval.
   </div>
@@ -200,7 +200,7 @@ if (!empty($q['accepted_optional'])) {
 <?php endif; ?>
 
 <!-- The quote as the customer sees it (same layout as the PDF and the accept page) -->
-<div class="card" style="background:#fff;max-width:820px;margin:0 auto;padding:2.2rem 2.4rem">
+<div class="paper">
   <?= quote_paper_html($q, $allItems, $link) ?>
 </div>
 <?php
