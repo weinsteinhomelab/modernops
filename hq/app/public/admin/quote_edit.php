@@ -216,18 +216,22 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
       <button type="button" class="btn secondary small" data-add="section" data-zone="optional">+ Section heading</button>
     </div>
 
-    <div style="display:flex;justify-content:flex-end;gap:1rem;margin-top:1rem;flex-wrap:wrap">
-      <div class="stat" style="padding:.6rem 1rem"><span class="l">One-time</span><div class="n" id="tOne" style="font-size:1.2rem">$0.00</div></div>
-      <div class="stat" style="padding:.6rem 1rem"><span class="l">Tax</span><div class="n" id="tTax" style="font-size:1.2rem">$0.00</div></div>
-      <div class="stat" style="padding:.6rem 1rem"><span class="l">One-time total</span><div class="n" id="tOneTotal" style="font-size:1.2rem">$0.00</div></div>
-      <div class="stat" style="padding:.6rem 1rem"><span class="l">Recurring</span><div class="n" id="tMo" style="font-size:1.2rem;line-height:1.35">$0.00/mo</div></div>
-      <div class="stat" style="padding:.6rem 1rem"><span class="l">Optional (not in totals)</span><div class="n" id="tOpt" style="font-size:1.2rem;line-height:1.35;color:var(--muted)">$0.00</div></div>
+    <!-- Totals: one row, no boxes or lines. Our cost and Profit are internal only. -->
+    <div class="qtotals">
+      <div><span class="l">One-time</span><div class="n" id="tOne">$0.00</div></div>
+      <div><span class="l">Tax</span><div class="n" id="tTax">$0.00</div></div>
+      <div><span class="l">One-time total</span><div class="n" id="tOneTotal">$0.00</div></div>
+      <div><span class="l">Recurring</span><div class="n" id="tMo">$0.00/mo</div></div>
+      <div><span class="l">Optional <em>not in totals</em></span><div class="n" id="tOpt" style="color:var(--muted)">$0.00</div></div>
+      <div<?= $canCosts ? '' : ' hidden' ?>><span class="l">Our cost <em>internal</em></span><div class="n" id="tCost" style="color:var(--muted)">$0.00</div></div>
+      <div<?= $canCosts ? '' : ' hidden' ?>><span class="l">Profit <em>internal</em></span><div class="n" id="tProfit">$0.00</div></div>
     </div>
-    <div style="display:<?= $canCosts ? 'flex' : 'none' ?>;justify-content:flex-end;gap:1rem;margin-top:.6rem;flex-wrap:wrap;align-items:center">
-      <span class="muted" style="font-size:.78rem">Internal only, never shown to the customer:</span>
-      <div class="stat" style="padding:.6rem 1rem"><span class="l">Our cost</span><div class="n" id="tCost" style="font-size:1.2rem;line-height:1.35;color:var(--muted)">$0.00</div></div>
-      <div class="stat" style="padding:.6rem 1rem"><span class="l">Profit</span><div class="n" id="tProfit" style="font-size:1.2rem;line-height:1.35">$0.00</div></div>
-    </div>
+    <style>
+      .qtotals{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1rem 1.5rem;margin-top:1.4rem;align-items:start}
+      .qtotals .l{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.3rem}
+      .qtotals .l em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.75}
+      .qtotals .n{font-family:Georgia,serif;font-size:1.2rem;font-weight:700;color:var(--accent);line-height:1.35}
+    </style>
   </div>
 
   <div class="card">
