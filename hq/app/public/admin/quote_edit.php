@@ -173,9 +173,9 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
 
   <div class="card">
     <strong>Line items</strong>
-    <div class="grid2" style="grid-template-columns:2fr auto;align-items:end;margin-top:.5rem">
-      <div><label>Add a saved item</label><select id="catalogPick"></select></div>
-      <div><button type="button" class="btn" id="addCat">+ Add</button></div>
+    <div class="row-actions" style="justify-content:space-between;margin-top:.2rem">
+      <span class="muted" style="font-size:.85rem">Add items from your pricebook, a custom line, or a section heading. Drag or use the arrows to reorder.</span>
+      <button type="button" class="btn" id="openPicker">+ Add to quote</button>
     </div>
     <style>
       .line-row input,.line-row select,.sec-row input{padding:.45rem .5rem;font-size:.9rem;min-width:0}
@@ -195,26 +195,14 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
     <div class="zone-h">One-time <span>— shown first on the quote</span></div>
     <div class="lhead"><span></span><span>Item</span><span style="text-align:center">Qty</span><?= $canCosts ? '<span>Our cost</span><span>Margin %</span>' : '' ?><span>Total cost</span><span>Billing</span><span style="text-align:right">Line total</span><span></span></div>
     <div class="zone" id="zoneOne" data-zone="one_time"></div>
-    <div class="row-actions" style="margin-top:.5rem">
-      <button type="button" class="btn secondary small" data-add="line" data-zone="one_time">+ Line</button>
-      <button type="button" class="btn secondary small" data-add="section" data-zone="one_time">+ Section heading</button>
-    </div>
 
     <div class="zone-h">Recurring <span>— always shown at the bottom of the quote</span></div>
     <div class="lhead"><span></span><span>Item</span><span style="text-align:center">Qty</span><?= $canCosts ? '<span>Our cost</span><span>Margin %</span>' : '' ?><span>Total cost</span><span>Billing</span><span style="text-align:right">Line total</span><span></span></div>
     <div class="zone" id="zoneRec" data-zone="monthly"></div>
-    <div class="row-actions" style="margin-top:.5rem">
-      <button type="button" class="btn secondary small" data-add="line" data-zone="monthly">+ Line</button>
-      <button type="button" class="btn secondary small" data-add="section" data-zone="monthly">+ Section heading</button>
-    </div>
 
     <div class="zone-h">Optional add-ons <span>— listed at the end of the quote, not counted in the totals</span></div>
     <div class="lhead"><span></span><span>Item</span><span style="text-align:center">Qty</span><?= $canCosts ? '<span>Our cost</span><span>Margin %</span>' : '' ?><span>Total cost</span><span>Billing</span><span style="text-align:right">Line total</span><span></span></div>
     <div class="zone" id="zoneOpt" data-zone="optional"></div>
-    <div class="row-actions" style="margin-top:.5rem">
-      <button type="button" class="btn secondary small" data-add="line" data-zone="optional">+ Line</button>
-      <button type="button" class="btn secondary small" data-add="section" data-zone="optional">+ Section heading</button>
-    </div>
 
     <!-- Totals: one row, no boxes or lines. Our cost and Profit are internal only. -->
     <div class="qtotals">
@@ -256,6 +244,50 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
     <a href="<?= $id ? 'quote_view.php?id='.$id : 'quotes.php' ?>" class="btn secondary">Cancel</a>
   </div>
 </form>
+
+<!-- Pricebook picker: one place to add anything to the quote -->
+<dialog id="picker" aria-labelledby="pickerTitle">
+  <div class="pk-head">
+    <strong id="pickerTitle" style="font-family:Georgia,serif;font-size:1.15rem">Add to quote</strong>
+    <button type="button" class="pk-x" id="pickerClose" aria-label="Close">×</button>
+  </div>
+  <div class="pk-target">
+    <span class="muted" style="font-size:.85rem">Add to:</span>
+    <label><input type="radio" name="pk_target" value="quote" checked> The quote</label>
+    <label><input type="radio" name="pk_target" value="optional"> Optional add-ons</label>
+  </div>
+  <input type="search" id="pkSearch" placeholder="Search the pricebook" autocomplete="off">
+  <div id="pkList" class="pk-list"></div>
+  <div class="pk-foot">
+    <button type="button" class="btn secondary small" id="pkCustom">+ New line item</button>
+    <span class="pk-sec">
+      <button type="button" class="btn secondary small" id="pkSection">+ Section heading</button>
+      <select id="pkSecZone" style="width:auto;padding:.3rem .5rem;font-size:.82rem"><option value="one_time">in One-time</option><option value="monthly">in Recurring</option></select>
+    </span>
+    <button type="button" class="btn small" id="pkDone" style="margin-left:auto">Done</button>
+  </div>
+</dialog>
+<style>
+  #picker{border:0;padding:0;margin:auto;width:min(760px,94vw);max-height:86vh;background:var(--surface);color:var(--text);box-shadow:0 20px 60px rgba(0,0,0,.35);border-radius:10px}
+  #picker::backdrop{background:rgba(0,0,0,.45)}
+  #picker[open]{display:flex;flex-direction:column}
+  .pk-head{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem .4rem}
+  .pk-x{background:transparent;border:0;color:var(--muted);font-size:1.5rem;cursor:pointer;line-height:1}
+  .pk-target{display:flex;gap:1rem;align-items:center;padding:0 1.25rem .6rem;flex-wrap:wrap}
+  .pk-target label{margin:0;display:flex;gap:.35rem;align-items:center;font-weight:500;color:var(--text);font-size:.9rem}
+  .pk-target input{width:auto}
+  #pkSearch{margin:0 1.25rem;width:calc(100% - 2.5rem)}
+  .pk-list{overflow:auto;padding:.4rem 1.25rem;flex:1;min-height:120px}
+  .pk-group{font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin:.9rem 0 .2rem}
+  .pk-item{display:grid;grid-template-columns:1fr auto auto;gap:.8rem;align-items:center;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid var(--border);padding:.6rem .2rem;color:var(--text);cursor:pointer;font:inherit}
+  .pk-item:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+  .pk-item .d{display:block;color:var(--muted);font-size:.8rem}
+  .pk-item .p{font-weight:700;white-space:nowrap}
+  .pk-item .ok{font-size:.75rem;color:var(--accent);font-weight:700;min-width:4.5rem;text-align:right}
+  .pk-empty{color:var(--muted);padding:1rem 0;font-size:.9rem}
+  .pk-foot{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:.8rem 1.25rem 1rem;border-top:1px solid var(--border)}
+  .pk-sec{display:flex;gap:.4rem;align-items:center}
+</style>
 
 <script>
   var CATALOG = <?= json_encode($catalog, JSON_UNESCAPED_SLASHES) ?>;
@@ -299,9 +331,6 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
   bizSel.addEventListener('change', fillContacts);
   fillContacts();
 
-  var cp = document.getElementById('catalogPick');
-  CATALOG.forEach(function(c,i){var o=document.createElement('option');o.value=i;o.textContent=c.title+' — $'+Number(c.unit_price).toFixed(2)+suffix(c.billing);cp.appendChild(o);});
-  if(!CATALOG.length){var o=document.createElement('option');o.textContent='(no saved items yet)';cp.appendChild(o);}
 
   var tp = document.getElementById('taxPreset');
   TAX_PRESETS.forEach(function(p,i){var o=document.createElement('option');o.value=i;o.textContent=p.label;tp.appendChild(o);});
@@ -441,11 +470,59 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
       var pr=rev[k]-cst[k]; return money(pr)+suffix(k)+(cst[k]>0?' <span style="font-size:.75rem;opacity:.75">('+Math.round(pr/cst[k]*100)+'%)</span>':'');
     }).join('<br>'):'$0.00';
   }
-  document.getElementById('addCat').addEventListener('click',function(){if(CATALOG.length){var c=CATALOG[cp.value||0];addLine({title:c.title,desc:c.description,qty:1,price:c.unit_price,cost:'',margin:DEFAULT_MARGIN,billing:c.billing});recalc();}});
-  document.querySelectorAll('[data-add]').forEach(function(b){ b.addEventListener('click',function(){
-    if(b.dataset.add==='section'){ addSection('', b.dataset.zone).querySelector('input').focus(); return; }
-    var optional = b.dataset.zone==='optional';
-    addLine({title:'',desc:'',qty:1,price:0,cost:'',margin:DEFAULT_MARGIN,billing:optional?'one_time':b.dataset.zone,optional:optional}); recalc();
+  // ---- Pricebook picker ----
+  var picker = document.getElementById('picker'), pkList = document.getElementById('pkList'), pkSearch = document.getElementById('pkSearch');
+  function pkOptional(){ return document.querySelector('input[name="pk_target"]:checked').value === 'optional'; }
+  function pkRender(){
+    var t = pkSearch.value.trim().toLowerCase(), h = '', any = false;
+    Object.keys(PERIODS).forEach(function(k){
+      var items = CATALOG.map(function(c,i){ return [c,i]; }).filter(function(p){
+        return p[0].billing === k && (!t || (p[0].title + ' ' + (p[0].description||'')).toLowerCase().indexOf(t) >= 0);
+      });
+      if (!items.length) return;
+      any = true;
+      h += '<div class="pk-group">' + esc(PERIODS[k][0]) + '</div>';
+      items.forEach(function(p){
+        var c = p[0];
+        h += '<button type="button" class="pk-item" data-i="' + p[1] + '"><span><strong>' + esc(c.title) + '</strong>' + (c.description ? '<span class="d">' + esc(c.description) + '</span>' : '') +
+             '</span><span class="p">' + money(c.unit_price) + suffix(c.billing) + '</span><span class="ok"></span></button>';
+      });
+    });
+    pkList.innerHTML = any ? h : '<div class="pk-empty">' + (CATALOG.length ? 'Nothing in the pricebook matches "' + esc(pkSearch.value) + '". Use + New line item below.' : 'Your pricebook is empty. Use + New line item below, or add items on the Catalog page.') + '</div>';
+  }
+  pkList.addEventListener('click', function(e){
+    var b = e.target.closest('.pk-item'); if (!b) return;
+    var c = CATALOG[+b.dataset.i];
+    addLine({title:c.title, desc:c.description, qty:1, price:c.unit_price, cost:'', margin:DEFAULT_MARGIN, billing:c.billing, optional:pkOptional()});
+    recalc();
+    var ok = b.querySelector('.ok'), n = (+b.dataset.n || 0) + 1; b.dataset.n = n;
+    ok.textContent = 'Added' + (n > 1 ? ' ×' + n : '');
+  });
+  function openPicker(){
+    pkSearch.value = ''; pkRender();
+    if (picker.showModal) picker.showModal(); else picker.setAttribute('open', '');
+    setTimeout(function(){ pkSearch.focus(); }, 30);
+  }
+  function closePicker(){ if (picker.close) picker.close(); else picker.removeAttribute('open'); }
+  document.getElementById('openPicker').addEventListener('click', openPicker);
+  document.getElementById('pickerClose').addEventListener('click', closePicker);
+  document.getElementById('pkDone').addEventListener('click', closePicker);
+  pkSearch.addEventListener('input', pkRender);
+  picker.addEventListener('click', function(e){ if (e.target === picker) closePicker(); });   // click outside the panel
+  document.getElementById('pkCustom').addEventListener('click', function(){
+    var opt = pkOptional();
+    closePicker();
+    var row = addLine({title:'', desc:'', qty:1, price:0, cost:'', margin:DEFAULT_MARGIN, billing:'one_time', optional:opt});
+    recalc(); if (row.scrollIntoView) row.scrollIntoView({block:'center'}); row.querySelector('[name="item_title[]"]').focus();
+  });
+  document.getElementById('pkSection').addEventListener('click', function(){
+    var zone = pkOptional() ? 'optional' : document.getElementById('pkSecZone').value;
+    closePicker();
+    var row = addSection('', zone); if (row.scrollIntoView) row.scrollIntoView({block:'center'}); row.querySelector('input').focus();
+  });
+  document.querySelectorAll('input[name="pk_target"]').forEach(function(r){ r.addEventListener('change', function(){
+    document.getElementById('pkSecZone').style.display = pkOptional() ? 'none' : '';
+    document.getElementById('pickerTitle').textContent = pkOptional() ? 'Add optional add-ons' : 'Add to quote';
   }); });
   document.getElementById('taxRate').addEventListener('input',recalc);
 
