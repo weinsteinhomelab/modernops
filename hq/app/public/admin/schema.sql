@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS quotes (
   approval_hash VARCHAR(64) DEFAULT NULL,
   tax_rate     DECIMAL(6,3) NOT NULL DEFAULT 0,
   tax_label    VARCHAR(80) NOT NULL DEFAULT 'Sales Tax',
+  margin       DECIMAL(8,2) DEFAULT NULL,
   discount     DECIMAL(10,2) NOT NULL DEFAULT 0,
   scope_of_work TEXT DEFAULT NULL,
   notes        TEXT DEFAULT NULL,

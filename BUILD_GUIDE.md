@@ -216,8 +216,9 @@ Quotes always go out from `email.quote_from`, whoever sends them.
 **Approvals** (`approvals` table, `quote_pricing_changes()` / `quote_after_save()`):
 - A user adding or changing a pricebook item creates a `catalog_add` / `catalog_edit`
   request instead of changing the Catalog. Approving applies it.
-- When a user saves a quote, every line is compared with the pricebook (same title,
-  same price, same billing period). Any difference, or a line not in the pricebook,
+- Pricebook prices are **our cost**. When a user saves a quote, every line is compared
+  with the pricebook: same title, same cost, same billing period, and a price equal to
+  cost + the standard margin (`quotes.margin`, see `std_price()`). Any difference, or a line not in the pricebook,
   sets `quotes.approval_status = 'pending'` with a hash of those lines and opens a
   `quote_pricing` request. Until it's approved the quote can't be emailed, downloaded
   or accepted online. Saving again with the same lines keeps the decision; changing
@@ -246,7 +247,8 @@ The code is identical for every client. Two things change:
 | `products.customers` / `quotes` / `inbox` | Which products are on |
 | `email.*` | Contact address printed on quotes, lead notifications, sending + quote mailbox, SMTP/IMAP hosts, Inbox mailboxes |
 | `quotes.tax_rate`, `tax_label` | Default tax on a new quote (each quote can change it) |
-| `quotes.first_number`, `valid_days`, `margin`, `notes` | New-quote defaults |
+| `quotes.first_number`, `valid_days`, `notes` | New-quote defaults |
+| `quotes.margin` | Standard margin %. Pricebook prices are our cost; selling price = cost + this margin. Each quote can set its own margin for all lines |
 | `quotes.thank_you`, `file_prefix`, `email_subject`, `email_body` | Quote wording; `{name}` and `{number}` are filled in |
 | `quotes.terms` | Terms & Conditions page, as `[heading, text]` pairs |
 | `quotes.accept_page` | The page on the client's website where customers view and accept quotes (`?t=` is added). Blank turns online acceptance off |

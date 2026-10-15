@@ -2,7 +2,7 @@
 /** Idempotent schema migrations so a live database upgrades itself safely. */
 require_once __DIR__ . '/_db.php';
 
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 
 /** Starting pricebook for an empty Catalog: the "catalog" list in the client file. */
 function catalog_defaults(): array {
@@ -215,6 +215,11 @@ function run_phase9_migration(): void {
     } catch (Exception $ex) {}
 }
 
+/** Phase 10: one margin for the whole quote (pricebook prices are our cost). */
+function run_phase10_migration(): void {
+    try { db()->exec("ALTER TABLE quotes ADD COLUMN IF NOT EXISTS margin DECIMAL(8,2) DEFAULT NULL AFTER tax_label"); } catch (Exception $ex) {}
+}
+
 function maybe_migrate(): void {
     try {
         $v = (int) (setting('schema_version', '1'));
@@ -227,6 +232,7 @@ function maybe_migrate(): void {
         if ($v < 7) run_phase7_migration();
         if ($v < 8) run_phase8_migration();
         if ($v < 9) run_phase9_migration();
+        if ($v < 10) run_phase10_migration();
         set_setting('schema_version', (string) SCHEMA_VERSION);
     } catch (Exception $ex) {}
 }

@@ -5,6 +5,7 @@ require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_billing.php';
 require_login();
 require_product('quotes');
+require_perm('quotes.costs');   // pricebook prices are our cost
 
 $id = (int)($_GET['id'] ?? 0);
 $st = db()->prepare('SELECT * FROM catalog_items WHERE id = ?');
@@ -39,7 +40,7 @@ layout_header('Edit item', 'catalog.php');
     <div class="grid-auto">
       <div><label>Title</label><input type="text" name="title" required value="<?= e($c['title']) ?>"></div>
       <div class="span-2"><label>Description</label><input type="text" name="description" value="<?= e($c['description']) ?>"></div>
-      <div><label>Unit price ($)</label><input type="number" step="0.01" min="0" name="unit_price" value="<?= e($c['unit_price']) ?>"></div>
+      <div><label>Our cost ($)</label><input type="number" step="0.01" min="0" name="unit_price" value="<?= e($c['unit_price']) ?>"></div>
       <div><label>Billing</label><select name="billing"><?= billing_options((string)$c['billing']) ?></select></div>
     </div>
     <div class="row-actions" style="margin-top:1.25rem">

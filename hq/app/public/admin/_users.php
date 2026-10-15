@@ -17,7 +17,7 @@ function perm_list(): array {
         'quotes.create'  => ['Build quotes', 'Create and edit quotes for their customers.', true],
         'quotes.send'    => ['Send quotes', 'Email quotes, download the PDF and share the customer link.', true],
         'quotes.costs'   => ['See cost and profit', 'See our cost, margin and profit on quotes.', false],
-        'pricing.free'   => ['Change prices without approval', 'Pricebook additions and price or billing changes on quotes skip the approval queue.', false],
+        'pricing.free'   => ['Change prices without approval', 'Pricebook additions and any cost, margin or billing change on quotes skip the approval queue.', false],
     ];
 }
 
@@ -141,38 +141,53 @@ function approval_request(string $type, string $summary, array $payload, int $qu
     return $id;
 }
 
+/** Standard margin %, from the client file (quotes.margin). */
+function std_margin(): float { return (float) client('quotes.margin', '30'); }
+
+/** Selling price for a pricebook cost at the standard margin. */
+function std_price(float $cost): float { return round($cost * (1 + std_margin() / 100), 2); }
+
 /**
- * Lines on a quote whose price or billing don't match the pricebook, or that
- * aren't in the pricebook at all. Section headings are ignored.
- * Returns [list of human-readable differences, hash of exactly those lines].
+ * Lines on a quote that don't follow the pricebook. Pricebook prices are OUR COST;
+ * a line follows the pricebook when its cost and billing match the item and its
+ * price is that cost plus the standard margin. Lines not in the pricebook count too.
+ * Section headings are ignored. Returns [human-readable differences, hash of those lines].
  */
 function quote_pricing_changes(array $lines): array {
     $cat = [];
     foreach (db()->query('SELECT title, unit_price, billing FROM catalog_items WHERE active = 1')->fetchAll() as $c) {
         $cat[mb_strtolower(trim($c['title']))][] = $c;
     }
+    $m = std_margin();
     $diffs = []; $sig = [];
     foreach ($lines as $l) {
         if (!empty($l['is_section'])) continue;
         $key = mb_strtolower(trim((string) $l['title']));
         $price = round((float) $l['unit_price'], 2);
+        $cost = $l['unit_cost'] === null || $l['unit_cost'] === '' ? null : round((float) $l['unit_cost'], 2);
         $bill = (string) $l['billing'];
         $match = false; $closest = null;
         foreach ($cat[$key] ?? [] as $c) {
             $closest = $closest ?? $c;
-            if (round((float) $c['unit_price'], 2) === $price && $c['billing'] === $bill) { $match = true; break; }
+            $cc = round((float) $c['unit_price'], 2);
+            if ($c['billing'] === $bill && ($cost === null || abs($cost - $cc) < 0.005) && abs($price - std_price($cc)) < 0.015) { $match = true; break; }
         }
         if ($match) continue;
-        $label = billing_label($bill);
         if ($closest === null) {
             $diffs[] = '"' . $l['title'] . '" is not in the pricebook (' . money($price) . billing_suffix($bill) . ')';
         } else {
+            $cc = round((float) $closest['unit_price'], 2);
             $parts = [];
-            if (round((float) $closest['unit_price'], 2) !== $price) $parts[] = 'price ' . money($closest['unit_price']) . ' → ' . money($price);
-            if ($closest['billing'] !== $bill) $parts[] = 'billing ' . billing_label($closest['billing']) . ' → ' . $label;
+            if ($cost !== null && abs($cost - $cc) >= 0.005) $parts[] = 'cost ' . money($cc) . ' → ' . money($cost);
+            if ($closest['billing'] !== $bill) $parts[] = 'billing ' . billing_label($closest['billing']) . ' → ' . billing_label($bill);
+            $base = $cost ?? $cc;
+            if (abs($price - std_price($base)) >= 0.015) {
+                $pm = $base > 0 ? round(($price / $base - 1) * 100, 1) : null;
+                $parts[] = 'price ' . money(std_price($base)) . ' → ' . money($price) . ($pm !== null ? ' (' . rtrim(rtrim(number_format($pm, 1), '0'), '.') . '% margin instead of ' . rtrim(rtrim(number_format($m, 1), '0'), '.') . '%)' : '');
+            }
             $diffs[] = '"' . $l['title'] . '": ' . implode(', ', $parts);
         }
-        $sig[] = $key . '|' . $price . '|' . $bill . '|' . (float) $l['quantity'];
+        $sig[] = $key . '|' . $price . '|' . $cost . '|' . $bill . '|' . (float) $l['quantity'];
     }
     sort($sig);
     return [$diffs, $diffs ? hash('sha256', implode("\n", $sig)) : ''];
@@ -223,6 +238,6 @@ function quote_after_save(int $qid): void {
     db()->prepare("UPDATE quotes SET approval_status = 'pending', approval_hash = ? WHERE id = ?")->execute([$hash, $qid]);
     $n = count($diffs);
     approval_request('quote_pricing',
-        'Quote #' . $q['quote_number'] . ' for ' . $q['biz'] . ': ' . $n . ' line' . ($n === 1 ? '' : 's') . ' differ from the pricebook',
+        'Quote #' . $q['quote_number'] . ' for ' . $q['biz'] . ': ' . $n . ($n === 1 ? ' line differs' : ' lines differ') . ' from the pricebook',
         ['hash' => $hash, 'diffs' => $diffs, 'quote_number' => $q['quote_number']], $qid);
 }

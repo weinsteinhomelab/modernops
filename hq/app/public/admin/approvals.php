@@ -89,7 +89,7 @@ layout_header('Approvals', 'approvals.php');
         <table style="max-width:640px">
           <tr><td class="muted" style="width:120px">Title</td><td><?= e($p['title'] ?? '') ?><?php if (!empty($p['before']) && ($p['before']['title'] ?? '') !== ($p['title'] ?? '')): ?> <span class="muted">(was <?= e($p['before']['title']) ?>)</span><?php endif; ?></td></tr>
           <tr><td class="muted">Description</td><td><?= e($p['description'] ?? '') ?></td></tr>
-          <tr><td class="muted">Price</td><td><strong><?= money($p['unit_price'] ?? 0) . e(billing_suffix($p['billing'] ?? 'one_time')) ?></strong> <?= e(billing_label($p['billing'] ?? 'one_time')) ?><?php if (!empty($p['before'])): ?> <span class="muted">(was <?= money($p['before']['unit_price']) . e(billing_suffix($p['before']['billing'])) ?> <?= e(billing_label($p['before']['billing'])) ?>)</span><?php endif; ?></td></tr>
+          <tr><td class="muted">Our cost</td><td><strong><?= money($p['unit_price'] ?? 0) . e(billing_suffix($p['billing'] ?? 'one_time')) ?></strong> <?= e(billing_label($p['billing'] ?? 'one_time')) ?><?php if (!empty($p['before'])): ?> <span class="muted">(was <?= money($p['before']['unit_price']) . e(billing_suffix($p['before']['billing'])) ?> <?= e(billing_label($p['before']['billing'])) ?>)</span><?php endif; ?></td></tr>
         </table>
       <?php endif; ?>
     </div>

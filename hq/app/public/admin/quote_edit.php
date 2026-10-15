@@ -34,6 +34,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $scope = trim($_POST['scope_of_work'] ?? '');
     $notes = trim($_POST['notes'] ?? '');
     $terms_included = isset($_POST['terms_included']) ? 1 : 0;
+    // One margin for the whole quote (only people who can see costs set it).
+    $qm = trim((string)($_POST['quote_margin'] ?? ''));
+    $quote_margin = can('quotes.costs') ? ($qm === '' ? null : (float)$qm) : ($quote['margin'] ?? null);
     $status = $_POST['status'] ?? 'draft';
     if (!in_array($status, ['draft','sent','accepted','declined'], true)) $status = 'draft';
 
@@ -57,17 +60,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // People who can't see costs never send them; keep what was there before, matched by line title.
         $keepCost = [];
         if (!can('quotes.costs')) foreach ($items as $old) $keepCost[mb_strtolower(trim($old['title']))] = [$old['unit_cost'], $old['margin']];
+        $catCost = [];   // pricebook prices are our cost
+        foreach (db()->query('SELECT title, unit_price FROM catalog_items WHERE active = 1')->fetchAll() as $c) $catCost[mb_strtolower(trim($c['title']))] = (float)$c['unit_price'];
         try {
             $pdo = db();
             $pdo->beginTransaction();
             if ($id) {
-                $u = $pdo->prepare('UPDATE quotes SET business_id=?, contact_id=?, quote_number=?, issue_date=?, valid_until=?, status=?, tax_rate=?, tax_label=?, scope_of_work=?, notes=?, terms_included=? WHERE id=?');
-                $u->execute([$business_id,$contact_id,$quote_number,$issue_date,$valid_until ?: null,$status,$tax_rate,$tax_label,$scope,$notes,$terms_included,$id]);
+                $u = $pdo->prepare('UPDATE quotes SET business_id=?, contact_id=?, quote_number=?, issue_date=?, valid_until=?, status=?, tax_rate=?, tax_label=?, margin=?, scope_of_work=?, notes=?, terms_included=? WHERE id=?');
+                $u->execute([$business_id,$contact_id,$quote_number,$issue_date,$valid_until ?: null,$status,$tax_rate,$tax_label,$quote_margin,$scope,$notes,$terms_included,$id]);
                 $pdo->prepare('DELETE FROM quote_items WHERE quote_id = ?')->execute([$id]);
                 $qid = $id;
             } else {
-                $ins = $pdo->prepare('INSERT INTO quotes (created_by, business_id, contact_id, quote_number, issue_date, valid_until, status, tax_rate, tax_label, scope_of_work, notes, terms_included) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)');
-                $ins->execute([me_id(), $business_id,$contact_id,$quote_number,$issue_date,$valid_until ?: null,$status,$tax_rate,$tax_label,$scope,$notes,$terms_included]);
+                $ins = $pdo->prepare('INSERT INTO quotes (created_by, business_id, contact_id, quote_number, issue_date, valid_until, status, tax_rate, tax_label, margin, scope_of_work, notes, terms_included) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)');
+                $ins->execute([me_id(), $business_id,$contact_id,$quote_number,$issue_date,$valid_until ?: null,$status,$tax_rate,$tax_label,$quote_margin,$scope,$notes,$terms_included]);
                 $qid = (int)$pdo->lastInsertId();
                 // advance the auto quote number if this used the current default
                 if ($quote_number === (string)setting('next_quote_number')) {
@@ -82,7 +87,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($t === '') continue;
                 $cost = trim((string)($costs[$i] ?? '')); $mg = trim((string)($margins[$i] ?? ''));
                 if (!can('quotes.costs')) {
-                    [$cost, $mg] = array_map(fn($v) => $v === null ? '' : (string)$v, $keepCost[mb_strtolower($t)] ?? [null, null]);
+                    $key = mb_strtolower($t);
+                    [$cost, $mg] = array_map(fn($v) => $v === null ? '' : (string)$v, $keepCost[$key] ?? [null, null]);
+                    // A new pricebook line: its cost is the pricebook price; work out the margin from the price they used.
+                    if ($cost === '' && isset($catCost[$key])) {
+                        $cost = (string)$catCost[$key];
+                        $p = (float)($prices[$i] ?? 0);
+                        $mg = (float)$cost > 0 ? (string)round(($p / (float)$cost - 1) * 100, 2) : '';
+                    }
                 }
                 $opt = empty($opts[$i]) ? 0 : 1;
                 if (!empty($secs[$i])) {
@@ -121,7 +133,14 @@ $st = db()->prepare("SELECT c.id, c.business_id, TRIM(CONCAT(COALESCE(c.first_na
                      FROM contacts c JOIN businesses b ON b.id = c.business_id WHERE $bs ORDER BY c.id");
 $st->execute($ba);
 $allContacts = $st->fetchAll();
-$catalog = db()->query("SELECT title, description, unit_price, billing FROM catalog_items WHERE active=1 ORDER BY billing, sort_order, title")->fetchAll();
+// Pricebook prices are our cost. People who can't see costs only get the selling price (cost + standard margin).
+$catalog = array_map(function ($c) {
+    $row = ['title' => $c['title'], 'description' => $c['description'], 'billing' => $c['billing'], 'price' => std_price((float)$c['unit_price'])];
+    if (can('quotes.costs')) $row['cost'] = (float)$c['unit_price'];
+    return $row;
+}, db()->query("SELECT title, description, unit_price, billing FROM catalog_items WHERE active=1 ORDER BY billing, sort_order, title")->fetchAll());
+$quoteMargin = $quote['margin'] ?? null;
+$quoteMargin = $quoteMargin === null ? rtrim(rtrim(number_format(std_margin(), 2, '.', ''), '0'), '.') : rtrim(rtrim(number_format((float)$quoteMargin, 2, '.', ''), '0'), '.');
 
 $preBusiness = (int)($_GET['business'] ?? ($quote['business_id'] ?? 0));
 $preContact  = (int)($quote['contact_id'] ?? 0);
@@ -175,8 +194,23 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
     <strong>Line items</strong>
     <div class="row-actions" style="justify-content:space-between;margin-top:.2rem">
       <span class="muted" style="font-size:.85rem">Add items from your pricebook, a custom line, or a section heading. Drag or use the arrows to reorder.</span>
-      <button type="button" class="btn" id="openPicker">+ Add to quote</button>
+      <span class="row-actions">
+        <?php if ($canCosts): ?>
+          <span class="qmargin">
+            <label for="quoteMargin">Margin for all lines</label>
+            <input type="number" step="0.1" id="quoteMargin" name="quote_margin" value="<?= e($quoteMargin) ?>"> %
+            <button type="button" class="btn secondary small" id="applyMargin">Apply to all lines</button>
+          </span>
+        <?php endif; ?>
+        <button type="button" class="btn" id="openPicker">+ Add to quote</button>
+      </span>
     </div>
+    <div class="muted" id="marginMsg" style="font-size:.82rem;text-align:right;min-height:1.1em"></div>
+    <style>
+      .qmargin{display:flex;align-items:center;gap:.4rem;font-size:.88rem;color:var(--muted)}
+      .qmargin label{margin:0;font-size:.82rem}
+      .qmargin input{width:5.5rem;padding:.4rem .5rem}
+    </style>
     <style>
       .line-row input,.line-row select,.sec-row input{padding:.45rem .5rem;font-size:.9rem;min-width:0}
       .line-row [name="item_desc[]"]{grid-column:2/-3;font-size:.82rem}
@@ -306,6 +340,8 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
   ];
 
   var DEFAULT_MARGIN = <?= json_encode((string) client('quotes.margin', '30')) ?>;
+  // The quote's margin box (people with cost access) sets the margin for new lines too.
+  function curMargin(){ var el = document.getElementById('quoteMargin'); return el && el.value !== '' ? el.value : DEFAULT_MARGIN; }
   var PERIODS = <?= json_encode(billing_periods(), JSON_UNESCAPED_SLASHES) ?>; // key => [label, suffix, months, box title]
   function months(b){return (PERIODS[b]||PERIODS.one_time)[2];}
   function suffix(b){return (PERIODS[b]||PERIODS.one_time)[1];}
@@ -383,7 +419,7 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
   }
 
   function addLine(it){
-    it = it || {title:'',desc:'',qty:1,price:0,cost:'',margin:DEFAULT_MARGIN,billing:'one_time'};
+    it = it || {title:'',desc:'',qty:1,price:0,cost:'',margin:curMargin(),billing:'one_time'};
     var row = document.createElement('div');
     row.className='line-row';
     row.style.cssText='display:grid;'+COLS+';gap:.4rem;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--border)';
@@ -485,7 +521,7 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
       items.forEach(function(p){
         var c = p[0];
         h += '<button type="button" class="pk-item" data-i="' + p[1] + '"><span><strong>' + esc(c.title) + '</strong>' + (c.description ? '<span class="d">' + esc(c.description) + '</span>' : '') +
-             '</span><span class="p">' + money(c.unit_price) + suffix(c.billing) + '</span><span class="ok"></span></button>';
+             '</span><span class="p">' + (CAN_COSTS ? '<span class="d" style="display:inline;margin-right:.5rem">cost ' + money(c.cost) + ' →</span>' + money(r2(c.cost * (1 + (parseFloat(curMargin())||0) / 100))) : money(c.price)) + suffix(c.billing) + '</span><span class="ok"></span></button>';
       });
     });
     pkList.innerHTML = any ? h : '<div class="pk-empty">' + (CATALOG.length ? 'Nothing in the pricebook matches "' + esc(pkSearch.value) + '". Use + New line item below.' : 'Your pricebook is empty. Use + New line item below, or add items on the Catalog page.') + '</div>';
@@ -493,7 +529,10 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
   pkList.addEventListener('click', function(e){
     var b = e.target.closest('.pk-item'); if (!b) return;
     var c = CATALOG[+b.dataset.i];
-    addLine({title:c.title, desc:c.description, qty:1, price:c.unit_price, cost:'', margin:DEFAULT_MARGIN, billing:c.billing, optional:pkOptional()});
+    // Pricebook price is our cost: price = cost + the quote's margin. Without cost access, use the standard selling price.
+    var m = parseFloat(curMargin()) || 0;
+    addLine(CAN_COSTS ? {title:c.title, desc:c.description, qty:1, cost:c.cost, margin:String(m), price:r2(c.cost * (1 + m / 100)), billing:c.billing, optional:pkOptional()}
+                      : {title:c.title, desc:c.description, qty:1, cost:'', margin:'', price:c.price, billing:c.billing, optional:pkOptional()});
     recalc();
     var ok = b.querySelector('.ok'), n = (+b.dataset.n || 0) + 1; b.dataset.n = n;
     ok.textContent = 'Added' + (n > 1 ? ' ×' + n : '');
@@ -512,7 +551,7 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
   document.getElementById('pkCustom').addEventListener('click', function(){
     var opt = pkOptional();
     closePicker();
-    var row = addLine({title:'', desc:'', qty:1, price:0, cost:'', margin:DEFAULT_MARGIN, billing:'one_time', optional:opt});
+    var row = addLine({title:'', desc:'', qty:1, price:0, cost:'', margin:curMargin(), billing:'one_time', optional:opt});
     recalc(); if (row.scrollIntoView) row.scrollIntoView({block:'center'}); row.querySelector('[name="item_title[]"]').focus();
   });
   document.getElementById('pkSection').addEventListener('click', function(){
@@ -524,6 +563,25 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
     document.getElementById('pkSecZone').style.display = pkOptional() ? 'none' : '';
     document.getElementById('pickerTitle').textContent = pkOptional() ? 'Add optional add-ons' : 'Add to quote';
   }); });
+  // ---- One margin for the whole quote ----
+  var applyBtn = document.getElementById('applyMargin');
+  if (applyBtn) applyBtn.addEventListener('click', function(){
+    var m = parseFloat(document.getElementById('quoteMargin').value);
+    var msg = document.getElementById('marginMsg');
+    if (isNaN(m)) { msg.textContent = 'Type a margin first.'; return; }
+    var done = 0, skipped = 0;
+    document.querySelectorAll('.line-row').forEach(function(r){
+      var cost = r.querySelector('[name="item_cost[]"]'), margin = r.querySelector('[name="item_margin[]"]'), price = r.querySelector('[name="item_price[]"]');
+      if (cost.value === '') { skipped++; return; }
+      margin.value = String(m);
+      price.value = r2((parseFloat(cost.value) || 0) * (1 + m / 100));
+      done++;
+    });
+    recalc();
+    msg.textContent = 'Set ' + done + ' line' + (done === 1 ? '' : 's') + ' to ' + m + '%.' +
+      (skipped ? ' ' + skipped + ' line' + (skipped === 1 ? ' has' : 's have') + ' no cost, so ' + (skipped === 1 ? 'its' : 'their') + ' price didn\'t change.' : '');
+  });
+
   document.getElementById('taxRate').addEventListener('input',recalc);
 
   if(INITIAL.length){ INITIAL.forEach(function(it){ if(it.section) addSection(it.title, it.optional ? 'optional' : (it.billing==='one_time'?'one_time':'monthly')); else addLine(it); }); } else { addLine(); }
