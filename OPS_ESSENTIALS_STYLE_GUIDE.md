@@ -105,7 +105,7 @@ Every page is built from `layout_header()` and `layout_footer()`.
   because it mirrors the printed PDF.
 - **Page head:** `h1.page`, then one line of `.sub` text saying what the page is
   for. The main action (`.btn`, e.g. "+ New quote") sits top right.
-- **Body:** stacked `.card`s, 1.25rem apart. One job per card.
+- **Body:** full-width sections (`.card`) separated by hairlines. No boxes, rounded panels or shadows; the only shaded areas are notices (`.notice`) and the quote preview (`.paper`). One job per section.
 - **Sections** always follow list → detail → create/edit (BUILD_GUIDE.md §4).
 
 **Mobile (640px and below)**
@@ -119,8 +119,8 @@ Every page is built from `layout_header()` and `layout_footer()`.
 
 | Component | Look | Use |
 |---|---|---|
-| Card (`.card`) | Surface, 1px border, 10px radius, 1.25rem × 1.4rem padding | Groups one job |
-| Stat (`.stat`) | Card with a big Georgia number + small uppercase label | Dashboard counts; the whole tile links to its list |
+| Section (`.card`) | No box: full width, a hairline rule above, 1.4rem top/bottom padding, Georgia heading from its first `<strong>` | Groups one job |
+| Stat (`.stat`) | No box: 3px accent bar on the left, big Georgia number + small uppercase label | Dashboard counts; links to its list |
 | Primary button (`.btn`) | Accent fill, white text, 7px radius | The one main action on a screen |
 | Secondary (`.btn.secondary`) | Surface fill, border | Everything else |
 | Small (`.btn.small`) | Tighter padding | Row actions in tables |

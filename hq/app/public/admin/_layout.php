@@ -70,9 +70,16 @@ function layout_header(string $title, string $active = ''): void {
   .grid-auto .span-2{grid-column:span 2}
   h1.page{font-family:Georgia,serif;font-size:1.5rem;font-weight:700;margin-bottom:.25rem}
   .sub{color:var(--muted);margin-bottom:1.5rem;font-size:.9rem}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.4rem;margin-bottom:1.25rem}
-  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:1.5rem}
-  .stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem}
+  /* No boxes: each "card" is a full-width section of the page, separated by a hairline. */
+  .card{background:transparent;border:0;border-top:1px solid var(--border);border-radius:0;padding:1.4rem 0;margin:0}
+  .card[style]{padding-left:0 !important;padding-right:0 !important;max-width:none !important}
+  .card > strong:first-child{display:block;font-family:Georgia,serif;font-size:1.08rem;font-weight:700;margin-bottom:.35rem}
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1.5rem;margin-bottom:1.75rem}
+  .stat{background:transparent;border:0;border-left:3px solid var(--accent);border-radius:0;padding:.15rem 0 .15rem 1rem}
+  /* Callouts (approval notices) and the quote "paper" are the only shaded areas. */
+  .notice{border-left:4px solid #e0b84c;background:color-mix(in srgb,#e0b84c 10%,transparent);padding:1rem 1.2rem;margin:0 0 1.25rem}
+  .notice.err{border-left-color:#b02424;background:color-mix(in srgb,#b02424 7%,transparent)}
+  .paper{background:#fff;color:#1a1a1a;max-width:820px;margin:1.4rem auto 0;padding:2.2rem 2.4rem;box-shadow:0 1px 3px rgba(0,0,0,.12),0 8px 30px rgba(0,0,0,.06)}
   .stat .n{font-family:Georgia,serif;font-size:1.8rem;font-weight:700;color:var(--accent);line-height:1}
   .stat .l{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:.4rem}
   table{width:100%;border-collapse:collapse;font-size:.9rem}
