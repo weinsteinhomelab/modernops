@@ -65,9 +65,9 @@ $perms = perm_list();
 </form>
 
 <div class="card" style="margin-top:1.25rem">
-  <strong>Email signature</strong>
-  <p class="muted" style="font-size:.9rem;margin-bottom:.8rem">Make an HTML signature with your details, photo and logo, then copy it into Gmail, Outlook or Apple Mail<?= product_on('inbox') ? ' — it can also go on emails you send from the Inbox' : '' ?>.</p>
-  <a class="btn secondary" href="signature.php">Edit your email signature</a>
+  <strong>Email signatures</strong>
+  <p class="muted" style="font-size:.9rem;margin-bottom:.8rem">Make HTML signatures with your details, photo and logo, copy them into Gmail, Outlook or Apple Mail<?= product_on('inbox') ? ', and pick one on any email you send from the Inbox' : '' ?>.</p>
+  <a class="btn secondary" href="signature.php">Your email signatures</a>
 </div>
 
 <?php if (!is_admin()): ?>

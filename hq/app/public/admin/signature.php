@@ -3,13 +3,18 @@
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_signature.php';
+require_once __DIR__ . '/_imap.php';   // mailbox colours
 require_login();
 
 $m = me();
 $uid = me_id();
-$saved = sig_load($uid, $m);
-$d = $saved ?? sig_defaults($m);
-$err = '';
+$canInbox = product_on('inbox');
+$myBoxes = $canInbox ? my_mailboxes() : [];
+$all = sig_all($uid, $m);
+$id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+$editing = $id > 0 || isset($_GET['new']);
+$cur = $id > 0 ? sig_get($uid, $id, $m) : null;
+if ($id > 0 && !$cur) { header('Location: signature.php'); exit; }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
@@ -22,21 +27,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($a === 'upload') {
         header('Content-Type: application/json');
-        $r = sig_store_upload($_FILES['image'] ?? [], $uid);
-        echo json_encode($r);
+        echo json_encode(sig_store_upload($_FILES['image'] ?? [], $uid));
         exit;
     }
-    $d = sig_clean($_POST, $m);
-    sig_save($uid, $d, !empty($_POST['add_to_inbox']));
+    if ($a === 'delete' && $cur) {
+        sig_delete($uid, $id);
+        log_activity('signature.deleted', 'user', $uid, $cur['name']);
+        header('Location: signature.php?deleted=1'); exit;
+    }
+    if ($a === 'duplicate' && $cur) {
+        $nid = sig_save($uid, 0, $cur['name'] . ' (copy)', $cur['data'], [], false);
+        header('Location: signature.php?id=' . $nid); exit;
+    }
+    $boxes = array_values(array_intersect((array)($_POST['mailboxes'] ?? []), $myBoxes));
+    $nid = sig_save($uid, $cur ? $id : 0, (string)($_POST['sig_name'] ?? ''), sig_clean($_POST, $m), $boxes, !empty($_POST['is_default']));
     log_activity('signature.saved', 'user', $uid);
-    header('Location: signature.php?saved=1');
-    exit;
+    header('Location: signature.php?saved=1&id=' . $nid); exit;
 }
 
-$addToInbox = $saved ? !empty($saved['add_to_inbox']) : true;
+$d = $cur ? $cur['data'] : sig_defaults($m);
+$first = !$all;
+$sigName = $cur ? $cur['name'] : ($first ? 'My signature' : 'New signature');
+$sigBoxes = $cur ? $cur['mailboxes'] : [];
+$sigDefault = $cur ? $cur['is_default'] : $first;
 $logo = sig_company_logo();
 
-layout_header('Email signature', 'signature.php');
+layout_header('Email signatures', $canInbox ? 'email.php' : 'account.php');
 ?>
 <style>
   .sig-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:0 3rem;align-items:start}
@@ -58,17 +74,68 @@ layout_header('Email signature', 'signature.php');
   input[type=color]{height:40px;padding:3px;width:64px}
   .colorrow{display:flex;gap:.5rem;align-items:center}
   .colorrow input[type=text]{width:110px;font-family:ui-monospace,monospace}
+  .mbdot{display:inline-block;width:9px;height:9px;border-radius:50%}
+  .mbchip{display:inline-block;font-size:.72rem;font-weight:700;padding:.1rem .5rem;border-radius:20px;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);white-space:nowrap}
   @media(max-width:980px){.sig-grid{grid-template-columns:1fr}.sig-side{position:static;margin-top:1rem}}
 </style>
 
-<h1 class="page">Email signature</h1>
-<p class="sub">Fill this in, watch the preview, then copy it into Gmail, Outlook or Apple Mail. <a href="account.php">&larr; Your account</a></p>
+<?php if (!$editing): ?>
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem">
+  <h1 class="page">Email signatures</h1>
+  <a class="btn" href="signature.php?new=1">+ New signature</a>
+</div>
+<p class="sub">Make as many as you like, e.g. one for your own address and one for info@. <?= $canInbox ? 'Each one can switch on by itself for the mailboxes you choose, and you can change it on any email in the Inbox.' : '' ?>
+  <?= $canInbox ? '<a href="email.php">&larr; Inbox</a>' : '<a href="account.php">&larr; Your account</a>' ?></p>
+<?php if (isset($_GET['deleted'])) flash('ok', 'Signature deleted.'); ?>
+<?php if (!$all): ?>
+  <div class="card empty">You don't have a signature yet. <a href="signature.php?new=1">Make your first one</a>.</div>
+<?php else: ?>
+  <table>
+    <thead><tr><th>Signature</th><?php if ($canInbox): ?><th>Switches on for</th><?php endif; ?><th style="width:1%"></th></tr></thead>
+    <tbody>
+    <?php foreach ($all as $s): ?>
+      <tr>
+        <td><a href="signature.php?id=<?= $s['id'] ?>" style="font-weight:600"><?= e($s['name']) ?></a>
+          <div class="muted" style="font-size:.82rem"><?= e(implode(' · ', array_filter([$s['data']['name'], $s['data']['title'], $s['data']['email']], 'strlen'))) ?></div></td>
+        <?php if ($canInbox): ?><td>
+          <?php foreach ($s['mailboxes'] as $mb): ?><span class="mbchip" style="--c:<?= e(mailbox_color($mb)) ?>"><?= e($mb) ?></span> <?php endforeach; ?>
+          <?php if ($s['is_default']): ?><span class="badge new">Default for everything else</span><?php endif; ?>
+          <?php if (!$s['mailboxes'] && !$s['is_default']): ?><span class="muted" style="font-size:.85rem">Only when you pick it</span><?php endif; ?>
+        </td><?php endif; ?>
+        <td style="white-space:nowrap"><a class="btn secondary small" href="signature.php?id=<?= $s['id'] ?>">Edit</a></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+<?php endif; ?>
+<?php layout_footer(); exit; endif; ?>
+
+<h1 class="page"><?= $cur ? 'Edit signature' : 'New signature' ?></h1>
+<p class="sub">Fill this in, watch the preview, then copy it into Gmail, Outlook or Apple Mail. <a href="signature.php">&larr; All signatures</a></p>
 <?php if (isset($_GET['saved'])) flash('ok', 'Signature saved.'); ?>
 
 <div class="sig-grid">
 <form method="post" id="sigForm" autocomplete="off">
   <?= csrf_field() ?>
   <input type="hidden" name="action" value="save">
+  <input type="hidden" name="id" value="<?= $cur ? (int) $cur['id'] : 0 ?>">
+
+  <div class="card" style="border-top:0;padding-top:0">
+    <label style="margin-top:0">Signature name (only you see this)</label>
+    <input type="text" name="sig_name" value="<?= e($sigName) ?>" maxlength="120" required>
+    <?php if ($canInbox && $myBoxes): ?>
+      <label>Switch on by itself when I send from</label>
+      <div class="seg">
+        <?php foreach ($myBoxes as $mb): ?>
+          <label><input type="checkbox" name="mailboxes[]" value="<?= e($mb) ?>"<?= in_array($mb, $sigBoxes, true) ? ' checked' : '' ?>> <span class="mbdot" style="background:<?= e(mailbox_color($mb)) ?>"></span><?= e($mb) ?></label>
+        <?php endforeach; ?>
+      </div>
+      <label style="display:flex;gap:.5rem;align-items:center;font-weight:500;color:var(--text)">
+        <input type="checkbox" name="is_default" value="1" style="width:auto"<?= $sigDefault ? ' checked' : '' ?>> Use it for any other mailbox too (default)
+      </label>
+      <p class="muted" style="font-size:.8rem;margin-top:.3rem">A mailbox can only switch on one signature; ticking it here takes it off your others. You can always pick a different signature on an email.</p>
+    <?php endif; ?>
+  </div>
   <input type="hidden" name="photo_key" id="photo_key" value="<?= e($d['photo_key']) ?>">
   <input type="hidden" name="logo_key" id="logo_key" value="<?= e($d['logo_key']) ?>">
 
@@ -150,16 +217,16 @@ layout_header('Email signature', 'signature.php');
     <strong>Small print</strong>
     <label>Disclaimer or note (optional)</label>
     <textarea name="disclaimer" rows="3" placeholder="This email and any attachments are confidential…"><?= e($d['disclaimer']) ?></textarea>
-    <?php if (product_on('inbox')): ?>
-      <label style="display:flex;gap:.5rem;align-items:center;font-weight:500;color:var(--text);margin-top:1rem">
-        <input type="checkbox" name="add_to_inbox" value="1" style="width:auto"<?= $addToInbox ? ' checked' : '' ?>> Add this signature to emails I send from the HQ Inbox
-      </label>
-    <?php endif; ?>
   </div>
 
   <div class="row-actions" style="border-top:1px solid var(--border);padding-top:1.2rem">
     <button class="btn" type="submit">Save signature</button>
     <span class="muted" style="font-size:.84rem" id="dirty" hidden>Unsaved changes</span>
+    <?php if ($cur): ?>
+      <span style="flex:1"></span>
+      <button class="btn secondary" type="submit" name="action" value="duplicate" formnovalidate>Duplicate</button>
+      <button class="btn danger" type="submit" name="action" value="delete" formnovalidate onclick="return confirm('Delete this signature?')">Delete</button>
+    <?php endif; ?>
   </div>
 </form>
 

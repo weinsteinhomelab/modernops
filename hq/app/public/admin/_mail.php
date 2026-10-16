@@ -49,11 +49,13 @@ function smtp_deliver(string $to, string $message, ?string $authUser = null, ?st
         $b = preg_replace('/^\./m', '..', $b);           // dot-stuff
         $b = str_replace("\n", "\r\n", $b);
         if ($code($cmd($b . "\r\n.")) !== 250) { fclose($fp); return false; }
-        $cmd('QUIT'); fclose($fp); return true;
+        $cmd('QUIT'); fclose($fp);
+        $GLOBALS['MOHQ_LAST_SENT'] = $message;   // so the Inbox can file a copy in Sent
+        return true;
     } catch (Throwable $ex) { @fclose($fp); return false; }
 }
 
-function base_headers(string $to, string $subject, string $replyTo, ?string $fromAddr = null, ?string $fromName = null): string {
+function base_headers(string $to, string $subject, string $replyTo, ?string $fromAddr = null, ?string $fromName = null, array $extra = []): string {
     $fromAddr = $fromAddr ?: MAIL_FROM;
     $fromName = $fromName ?: MAIL_FROM_NAME;
     $h  = 'From: ' . mime_header($fromName) . ' <' . $fromAddr . ">\r\n";
@@ -61,6 +63,11 @@ function base_headers(string $to, string $subject, string $replyTo, ?string $fro
     if ($replyTo !== '') $h .= 'Reply-To: <' . $replyTo . ">\r\n";
     $h .= 'Subject: ' . mime_header($subject) . "\r\n";
     $h .= 'Date: ' . date('r') . "\r\n";
+    // A Message-ID is expected on every email; spam filters score its absence.
+    $h .= 'Message-ID: <' . bin2hex(random_bytes(12)) . '.' . time() . '@' . (substr((string) strrchr($fromAddr, '@'), 1) ?: 'localhost') . ">\r\n";
+    foreach ($extra as $k => $v) {
+        if (preg_match('/^[A-Za-z-]+$/', (string) $k) && !preg_match('/[\r\n]/', (string) $v)) $h .= $k . ': ' . $v . "\r\n";
+    }
     $h .= "MIME-Version: 1.0\r\n";
     return $h;
 }
@@ -74,17 +81,17 @@ function send_mail(string $to, string $subject, string $body, string $replyTo = 
 }
 
 /** Plain-text email sent from a specific mailbox (same shared password). */
-function send_plain(string $to, string $subject, string $body, string $fromUser, string $fromAddr, string $fromName = '', string $replyTo = ''): bool {
-    $msg = base_headers($to, $subject, $replyTo, $fromAddr, $fromName)
+function send_plain(string $to, string $subject, string $body, string $fromUser, string $fromAddr, string $fromName = '', string $replyTo = '', array $extra = []): bool {
+    $msg = base_headers($to, $subject, $replyTo, $fromAddr, $fromName, $extra)
          . "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
          . $body;
     return smtp_deliver($to, $msg, $fromUser, $fromAddr);
 }
 
 /** Text + HTML email (e.g. with an HTML signature) sent from a specific mailbox. */
-function send_alt(string $to, string $subject, string $text, string $html, string $fromUser, string $fromAddr, string $fromName = '', string $replyTo = ''): bool {
+function send_alt(string $to, string $subject, string $text, string $html, string $fromUser, string $fromAddr, string $fromName = '', string $replyTo = '', array $extra = []): bool {
     $boundary = 'MOHQ-' . bin2hex(random_bytes(10));
-    $msg  = base_headers($to, $subject, $replyTo, $fromAddr, $fromName);
+    $msg  = base_headers($to, $subject, $replyTo, $fromAddr, $fromName, $extra);
     $msg .= 'Content-Type: multipart/alternative; boundary="' . $boundary . "\"\r\n\r\n";
     $msg .= '--' . $boundary . "\r\n";
     $msg .= "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($text)) . "\r\n";

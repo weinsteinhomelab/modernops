@@ -1,7 +1,9 @@
 <?php
 /**
- * Email signatures: one per person, built on signature.php, pasted into Gmail /
- * Outlook / Apple Mail, and added to messages sent from Ops Inbox.
+ * Email signatures: each person can keep several (e.g. one for peter@, one for
+ * info@), built on signature.php, pasted into Gmail / Outlook / Apple Mail, and
+ * picked per message in the Inbox. A signature can be set to switch on by itself
+ * for certain mailboxes; one can be the default for everything else.
  *
  * The HTML is email-safe on purpose: tables, inline styles, web-safe fonts, PNG/JPG
  * images with fixed sizes. Images are served by /api/sig_image.php so they load
@@ -38,10 +40,14 @@ function sig_ensure(): void {
     if ($done) return;
     $done = true;
     db()->exec("CREATE TABLE IF NOT EXISTS email_signatures (
-        user_id INT PRIMARY KEY,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        name VARCHAR(120) NOT NULL DEFAULT 'Signature',
         data TEXT NOT NULL,
-        add_to_inbox TINYINT NOT NULL DEFAULT 1,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        mailboxes TEXT DEFAULT NULL,
+        is_default TINYINT NOT NULL DEFAULT 0,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX (user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     db()->exec("CREATE TABLE IF NOT EXISTS sig_images (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -143,23 +149,68 @@ function sig_clean(array $in, array $user): array {
     return $d;
 }
 
-function sig_load(int $uid, array $user): ?array {
+/** Every signature this person has: [id, name, mailboxes[], is_default, data]. */
+function sig_all(int $uid, array $user): array {
     sig_ensure();
-    $st = db()->prepare('SELECT data, add_to_inbox FROM email_signatures WHERE user_id = ?');
+    $st = db()->prepare('SELECT * FROM email_signatures WHERE user_id = ? ORDER BY is_default DESC, name, id');
     $st->execute([$uid]);
+    $out = [];
+    foreach ($st->fetchAll() as $row) $out[] = sig_row($row, $user);
+    return $out;
+}
+function sig_row(array $row, array $user): array {
+    return [
+        'id'         => (int) $row['id'],
+        'name'       => (string) $row['name'],
+        'mailboxes'  => array_values(array_filter((array) json_decode((string) $row['mailboxes'], true), 'is_string')),
+        'is_default' => (int) $row['is_default'] === 1,
+        'data'       => sig_clean((array) json_decode((string) $row['data'], true), $user),
+    ];
+}
+function sig_get(int $uid, int $id, array $user): ?array {
+    sig_ensure();
+    $st = db()->prepare('SELECT * FROM email_signatures WHERE id = ? AND user_id = ?');
+    $st->execute([$id, $uid]);
     $row = $st->fetch();
-    if (!$row) return null;
-    $d = sig_clean((array) json_decode((string) $row['data'], true), $user);
-    $d['add_to_inbox'] = (int) $row['add_to_inbox'];
-    return $d;
+    return $row ? sig_row($row, $user) : null;
 }
 
-function sig_save(int $uid, array $d, bool $addToInbox): void {
+/** Create (id 0) or update one signature; returns its id. A mailbox belongs to one signature only. */
+function sig_save(int $uid, int $id, string $name, array $d, array $mailboxes, bool $isDefault): int {
     sig_ensure();
-    unset($d['add_to_inbox']);
-    db()->prepare('INSERT INTO email_signatures (user_id, data, add_to_inbox) VALUES (?,?,?)
-                   ON DUPLICATE KEY UPDATE data = VALUES(data), add_to_inbox = VALUES(add_to_inbox)')
-        ->execute([$uid, json_encode($d, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $addToInbox ? 1 : 0]);
+    $name = mb_substr(trim($name), 0, 120) ?: 'Signature';
+    $json = json_encode($d, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $mb = json_encode(array_values(array_unique($mailboxes)));
+    if ($id > 0) {
+        db()->prepare('UPDATE email_signatures SET name = ?, data = ?, mailboxes = ?, is_default = ? WHERE id = ? AND user_id = ?')
+            ->execute([$name, $json, $mb, $isDefault ? 1 : 0, $id, $uid]);
+    } else {
+        db()->prepare('INSERT INTO email_signatures (user_id, name, data, mailboxes, is_default) VALUES (?,?,?,?,?)')
+            ->execute([$uid, $name, $json, $mb, $isDefault ? 1 : 0]);
+        $id = (int) db()->lastInsertId();
+    }
+    if ($isDefault) db()->prepare('UPDATE email_signatures SET is_default = 0 WHERE user_id = ? AND id <> ?')->execute([$uid, $id]);
+    // Take these mailboxes away from this person's other signatures.
+    foreach (sig_all($uid, []) as $o) {
+        if ($o['id'] === $id) continue;
+        $left = array_values(array_diff($o['mailboxes'], $mailboxes));
+        if ($left !== $o['mailboxes']) db()->prepare('UPDATE email_signatures SET mailboxes = ? WHERE id = ?')->execute([json_encode($left), $o['id']]);
+    }
+    return $id;
+}
+function sig_delete(int $uid, int $id): void {
+    sig_ensure();
+    db()->prepare('DELETE FROM email_signatures WHERE id = ? AND user_id = ?')->execute([$id, $uid]);
+}
+
+/** The signature that switches on by itself when sending from $account (or the default), or null. */
+function sig_for(int $uid, string $account, array $user): ?array {
+    $def = null;
+    foreach (sig_all($uid, $user) as $s) {
+        if (in_array($account, $s['mailboxes'], true)) return $s;
+        if ($s['is_default'] && !$def) $def = $s;
+    }
+    return $def;
 }
 
 /** "modern-ops.net" -> https://modern-ops.net ; only http(s) links survive. */

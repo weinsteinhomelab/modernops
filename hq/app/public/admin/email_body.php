@@ -18,10 +18,11 @@ header('Cache-Control: private, no-store');
 if (!imap_ready()) { http_response_code(503); exit; }
 $accounts = my_mailboxes();   // admins: all; users: the ones an admin gave them
 if (!$accounts) deny('No mailboxes have been shared with you yet.');
-$ai = (int)($_GET['acct'] ?? 0);
-if ($ai < 0 || $ai >= count($accounts)) $ai = 0;
+$ai = (int)($_GET['a'] ?? -1);
+$folder = (string)($_GET['f'] ?? 'INBOX');
+if ($ai < 0 || $ai >= count($accounts) || imap_box_of($folder) === null) { http_response_code(404); exit; }
 
-try { $msg = imap_open($accounts[$ai], (int)($_GET['uid'] ?? 0)); }
+try { $msg = mbox_open($accounts[$ai], $folder, (int)($_GET['uid'] ?? 0)); }
 catch (\Throwable $e) { $msg = null; }
 if (!$msg || $msg['html'] === '') { http_response_code(404); echo 'Message not found.'; exit; }
 
