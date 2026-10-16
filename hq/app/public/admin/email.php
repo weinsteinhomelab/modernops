@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $html = '<div style="' . $font . '">' . nl2br(e($top)) . '</div><br>' . sig_html($sig['data'])
                   . ($quoted !== '' ? '<div style="' . $font . ';color:#555555;margin-top:16px">' . nl2br(e($quoted)) . '</div>' : '');
             $text = $top . "\n\n-- \n" . sig_text($sig['data']) . ($quoted !== '' ? "\n\n" . $quoted : '');
-            $ok = send_alt($to, $subject, $text, '<!DOCTYPE html><html><body>' . $html . '</body></html>', $from, $from, $name, '', $extra);
+            $ok = send_alt($to, $subject, $text, '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' . $html . '</body></html>', $from, $from, $name, '', $extra);
         } else {
             $ok = send_plain($to, $subject, $body, $from, $from, $name, '', $extra);
         }

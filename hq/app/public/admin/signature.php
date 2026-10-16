@@ -243,7 +243,7 @@ layout_header('Email signatures', $canInbox ? 'email.php' : 'account.php');
       <button type="button" class="btn secondary" id="dlHtm">Download .htm</button>
       <span class="muted" id="copyMsg" style="font-size:.84rem"></span>
     </div>
-    <p class="muted" style="font-size:.8rem;margin-top:.6rem">Pictures load from <?= e(sig_public_base()) ?>, so they show up for the people you email.</p>
+    <p class="muted" style="font-size:.8rem;margin-top:.6rem">Pictures load from <?= e(preg_replace('#^https?://([^/]+).*#', '$1', (string) client('email.signature_images', '') ?: sig_public_base())) ?>, so they show up for the people you email.</p>
   </div>
 
   <div class="card howto">

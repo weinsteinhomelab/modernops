@@ -1,0 +1,6 @@
+# Email-signature pictures, served from our own domain (spam filters like images on the sender's domain).
+# /email-img/logo.png and /email-img/<32-hex key>.<png|jpg|gif> are relayed from HQ by index.php.
+Options -Indexes
+RewriteEngine On
+RewriteRule ^logo\.(png|jpe?g|gif)$ index.php?logo=1 [L]
+RewriteRule ^([a-f0-9]{32})\.(png|jpe?g|gif)$ index.php?k=$1 [L]

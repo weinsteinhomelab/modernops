@@ -57,6 +57,8 @@ return [
         'imap_encryption' => 'ssl',
         // Mailboxes shown in Ops Inbox (all share SMTP_PASS)
         'accounts'        => ['peter@modern-ops.net', 'info@modern-ops.net', 'service@modern-ops.net', 'quote@modern-ops.net'],
+        // Signature pictures in emails load from here (the website's email-img/ relay), so they come from our own domain
+        'signature_images' => 'https://modern-ops.net/email-img/',
     ],
 
     // Quotes

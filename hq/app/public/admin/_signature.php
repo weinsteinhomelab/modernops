@@ -223,23 +223,36 @@ function sig_link(string $u): string {
 function sig_tel(string $p): string { return 'tel:' . preg_replace('/[^0-9+]/', '', $p); }
 function sig_display_url(string $u): string { return preg_replace('#^https?://(www\.)?#i', '', rtrim($u, '/')); }
 
+/**
+ * Where an email loads a signature picture from. With email.signature_images set (the website's
+ * email-img/ relay) it's e.g. https://modern-ops.net/email-img/logo.png: spam filters prefer images on
+ * the sender's own domain. Otherwise HQ serves it.
+ */
+function sig_img_url(string $name, string $mime): string {
+    $relay = (string) client('email.signature_images', '');
+    if ($relay !== '') {
+        $ext = ['image/jpeg' => 'jpg', 'image/gif' => 'gif'][$mime] ?? 'png';
+        return rtrim($relay, '/') . '/' . $name . '.' . $ext;
+    }
+    return sig_public_base() . '/api/sig_image.php?' . ($name === 'logo' ? 'logo=1' : 'k=' . $name);
+}
+
 /** Image facts for the signature: [url, width, height] or null. */
 function sig_logo_img(array $d): ?array {
-    $base = sig_public_base() . '/api/sig_image.php';
     if ($d['logo'] === 'none') return null;
     if ($d['logo'] === 'custom' && ($img = sig_image($d['logo_key']))) {
         [$w, $h] = [(int) $img['width'], (int) $img['height']];
-        $url = $base . '?k=' . $img['k'];
+        $url = sig_img_url($img['k'], (string) $img['mime']);
     } elseif ($d['logo'] === 'company' && ($c = sig_company_logo())) {
         [$w, $h] = [$c['width'], $c['height']];
-        $url = $base . '?logo=1';
+        $url = sig_img_url('logo', $c['mime']);
     } else return null;
     $dw = (int) $d['logo_width'];
     return [$url, $dw, $w ? max(1, (int) round($h * $dw / $w)) : $dw];
 }
 function sig_photo_img(array $d): ?array {
     if ($d['photo_key'] === '' || !($img = sig_image($d['photo_key']))) return null;
-    return [sig_public_base() . '/api/sig_image.php?k=' . $img['k'], 84, 84];
+    return [sig_img_url($img['k'], (string) $img['mime']), 84, 84];
 }
 
 /** The signature as email-safe HTML. */

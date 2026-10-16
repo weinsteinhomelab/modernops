@@ -55,6 +55,11 @@ function smtp_deliver(string $to, string $message, ?string $authUser = null, ?st
     } catch (Throwable $ex) { @fclose($fp); return false; }
 }
 
+/** Quoted-printable: how normal mail apps send text (readable, short lines). Base64 text parts score worse with spam filters. */
+function qp(string $s): string {
+    return quoted_printable_encode(str_replace(["\r\n", "\r"], "\n", $s));
+}
+
 function base_headers(string $to, string $subject, string $replyTo, ?string $fromAddr = null, ?string $fromName = null, array $extra = []): string {
     $fromAddr = $fromAddr ?: MAIL_FROM;
     $fromName = $fromName ?: MAIL_FROM_NAME;
@@ -75,16 +80,16 @@ function base_headers(string $to, string $subject, string $replyTo, ?string $fro
 /** Plain-text email. */
 function send_mail(string $to, string $subject, string $body, string $replyTo = ''): bool {
     $msg = base_headers($to, $subject, $replyTo)
-         . "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
-         . $body;
+         . "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n"
+         . qp($body);
     return smtp_deliver($to, $msg);
 }
 
 /** Plain-text email sent from a specific mailbox (same shared password). */
 function send_plain(string $to, string $subject, string $body, string $fromUser, string $fromAddr, string $fromName = '', string $replyTo = '', array $extra = []): bool {
     $msg = base_headers($to, $subject, $replyTo, $fromAddr, $fromName, $extra)
-         . "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
-         . $body;
+         . "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n"
+         . qp($body);
     return smtp_deliver($to, $msg, $fromUser, $fromAddr);
 }
 
@@ -94,9 +99,9 @@ function send_alt(string $to, string $subject, string $text, string $html, strin
     $msg  = base_headers($to, $subject, $replyTo, $fromAddr, $fromName, $extra);
     $msg .= 'Content-Type: multipart/alternative; boundary="' . $boundary . "\"\r\n\r\n";
     $msg .= '--' . $boundary . "\r\n";
-    $msg .= "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($text)) . "\r\n";
+    $msg .= "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n" . qp($text) . "\r\n";
     $msg .= '--' . $boundary . "\r\n";
-    $msg .= "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($html)) . "\r\n";
+    $msg .= "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n" . qp($html) . "\r\n";
     $msg .= '--' . $boundary . "--";
     return smtp_deliver($to, $msg, $fromUser, $fromAddr);
 }
@@ -107,7 +112,7 @@ function send_mail_pdf(string $to, string $subject, string $body, string $pdfByt
     $msg  = base_headers($to, $subject, $replyTo, $fromAddr, $fromName);
     $msg .= 'Content-Type: multipart/mixed; boundary="' . $boundary . "\"\r\n\r\n";
     $msg .= '--' . $boundary . "\r\n";
-    $msg .= "Content-Type: text/plain; charset=UTF-8\r\n\r\n" . $body . "\r\n";
+    $msg .= "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n" . qp($body) . "\r\n";
     $msg .= '--' . $boundary . "\r\n";
     $msg .= 'Content-Type: application/pdf; name="' . $pdfName . "\"\r\n";
     $msg .= "Content-Transfer-Encoding: base64\r\n";

@@ -49,6 +49,8 @@ return [
         'imap_port'       => 993,
         'imap_encryption' => 'ssl',
         'accounts'        => ['info@clientdomain.com'],
+        // Optional: the client website's email-img/ relay, so signature pictures come from their domain (blank = HQ's public_url)
+        'signature_images' => '',
     ],
 
     'quotes' => [
