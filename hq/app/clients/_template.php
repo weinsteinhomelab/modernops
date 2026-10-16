@@ -16,6 +16,7 @@ return [
     'timezone'  => 'America/New_York',   // e.g. America/Chicago, America/Denver, America/Los_Angeles
     'domain'    => 'clientdomain.com',
     'site_origin' => 'https://clientdomain.com', // their website, allowed to post leads in
+    'public_url' => '', // HQ's public address; email-signature images load from here (blank = the address you're using)
 
     'colors' => [
         'accent'      => '#1a6b4a',      // buttons, links, active nav

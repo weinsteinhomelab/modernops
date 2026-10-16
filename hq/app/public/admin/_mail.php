@@ -81,6 +81,19 @@ function send_plain(string $to, string $subject, string $body, string $fromUser,
     return smtp_deliver($to, $msg, $fromUser, $fromAddr);
 }
 
+/** Text + HTML email (e.g. with an HTML signature) sent from a specific mailbox. */
+function send_alt(string $to, string $subject, string $text, string $html, string $fromUser, string $fromAddr, string $fromName = '', string $replyTo = ''): bool {
+    $boundary = 'MOHQ-' . bin2hex(random_bytes(10));
+    $msg  = base_headers($to, $subject, $replyTo, $fromAddr, $fromName);
+    $msg .= 'Content-Type: multipart/alternative; boundary="' . $boundary . "\"\r\n\r\n";
+    $msg .= '--' . $boundary . "\r\n";
+    $msg .= "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($text)) . "\r\n";
+    $msg .= '--' . $boundary . "\r\n";
+    $msg .= "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($html)) . "\r\n";
+    $msg .= '--' . $boundary . "--";
+    return smtp_deliver($to, $msg, $fromUser, $fromAddr);
+}
+
 /** Email with a PDF attachment, optionally from a specific mailbox. */
 function send_mail_pdf(string $to, string $subject, string $body, string $pdfBytes, string $pdfName, string $replyTo = '', ?string $fromUser = null, ?string $fromAddr = null, ?string $fromName = null): bool {
     $boundary = 'MOHQ-' . bin2hex(random_bytes(10));

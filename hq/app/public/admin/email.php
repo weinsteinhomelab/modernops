@@ -4,6 +4,7 @@ require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_imap.php';
 require_once __DIR__ . '/_mail.php';
+require_once __DIR__ . '/_signature.php';
 require_login();
 require_product('inbox');
 
@@ -32,7 +33,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $subject = trim($_POST['subject'] ?? '');
         $body = (string)($_POST['body'] ?? '');
         if ($to === '') { header('Location: email.php?acct=' . $ai . '&senderr=1'); exit; }
-        $ok = send_plain($to, $subject, $body, $from, $from, (string) client('name'));
+        $sig = !empty($_POST['add_sig']) ? sig_load(me_id(), me()) : null;
+        if ($sig) {
+            $body = str_replace("\r\n", "\n", $body);
+            // Signature goes above the quoted message on replies.
+            $cut = strpos($body, "\n--- On ");
+            $top = $cut === false ? $body : substr($body, 0, $cut);
+            $quoted = $cut === false ? '' : substr($body, $cut);
+            $top = rtrim($top);
+            $font = 'font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#222222';
+            $html = '<div style="' . $font . '">' . nl2br(e($top)) . '</div><br>' . sig_html($sig)
+                  . ($quoted !== '' ? '<div style="' . $font . ';color:#555555;margin-top:16px">' . nl2br(e(ltrim($quoted, "\n"))) . '</div>' : '');
+            $text = $top . "\n\n-- \n" . sig_text($sig) . ($quoted !== '' ? "\n" . $quoted : '');
+            $ok = send_alt($to, $subject, $text, '<!DOCTYPE html><html><body>' . $html . '</body></html>', $from, $from, (string) client('name'));
+        } else {
+            $ok = send_plain($to, $subject, $body, $from, $from, (string) client('name'));
+        }
         header('Location: email.php?acct=' . $ai . ($ok ? '&sent=1' : '&senderr=1'));
         exit;
     } elseif ($a === 'delete') {
@@ -105,6 +121,17 @@ if ($err) flash('err', $err);
         <label>To</label><input type="email" name="to" value="<?= e($prefill['to']) ?>" required>
         <label>Subject</label><input type="text" name="subject" value="<?= e($prefill['subject']) ?>">
         <label>Message</label><textarea name="body" rows="12"><?= e($prefill['body']) ?></textarea>
+        <?php $mySig = sig_load(me_id(), me()); ?>
+        <?php if ($mySig): ?>
+          <label style="display:flex;gap:.5rem;align-items:center;font-weight:500;color:var(--text)">
+            <input type="checkbox" name="add_sig" value="1" style="width:auto" id="addSig"<?= !empty($mySig['add_to_inbox']) ? ' checked' : '' ?>> Add my signature <a href="signature.php" style="font-weight:400;font-size:.84rem">edit</a>
+          </label>
+          <style>.sig-reset table{width:auto}.sig-reset td{padding:0;border:0}</style>
+          <div id="sigPrev" class="sig-reset" style="background:#fff;color:#333;padding:1rem 1.2rem;margin-top:.4rem;border:1px solid var(--border)<?= empty($mySig['add_to_inbox']) ? ';display:none' : '' ?>"><?= sig_html($mySig) ?></div>
+          <script>document.getElementById('addSig').addEventListener('change',function(){document.getElementById('sigPrev').style.display=this.checked?'':'none';});</script>
+        <?php else: ?>
+          <p class="muted" style="font-size:.84rem;margin-top:.6rem"><a href="signature.php">Make an email signature</a> to add it to messages you send from here.</p>
+        <?php endif; ?>
         <div style="margin-top:1rem"><button class="btn" type="submit">Send</button></div>
       </form>
 

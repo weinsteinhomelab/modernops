@@ -19,6 +19,7 @@ return [
     'timezone'  => 'America/New_York',   // dates and times in HQ, on quotes and acceptance records
     'domain'    => 'modern-ops.net',     // bare domain, no https://
     'site_origin' => 'https://modern-ops.net', // the website allowed to post leads to /api/submit.php
+    'public_url' => 'https://hq.kobylab.dev', // HQ's public address; email-signature images load from here (blank = the address you're using)
 
     // Brand colors. accent drives buttons/links; deep + tint are used on quotes and PDFs.
     'colors' => [
