@@ -231,6 +231,20 @@ if ($view === 'compose' && product_on('customers')) {
             $custPics[$bid]['pics'][] = $r;
             if (in_array((int) $r['id'], $prefill['pics'], true)) $custPics[$bid]['pre'] = true;
         }
+        if ($custPics) {
+            $in = implode(',', array_map('intval', array_keys($custPics)));
+            $people = [];
+            foreach (db()->query("SELECT id, name, main_email FROM businesses WHERE id IN ($in)")->fetchAll() as $bz) {
+                if (filter_var((string) $bz['main_email'], FILTER_VALIDATE_EMAIL)) $people[(int) $bz['id']][strtolower($bz['main_email'])] = ['label' => 'Main email', 'email' => $bz['main_email']];
+            }
+            foreach (db()->query("SELECT business_id, first_name, last_name, title, email FROM contacts WHERE business_id IN ($in) AND email <> '' ORDER BY id")->fetchAll() as $c) {
+                if (!filter_var((string) $c['email'], FILTER_VALIDATE_EMAIL)) continue;
+                $nm = trim($c['first_name'] . ' ' . $c['last_name']);
+                $people[(int) $c['business_id']][strtolower($c['email'])] = ['label' => ($nm ?: 'Contact') . ($c['title'] ? ' (' . $c['title'] . ')' : ''), 'email' => $c['email']];
+            }
+            foreach ($custPics as $bid => &$g) $g['people'] = array_values($people[$bid] ?? []);
+            unset($g);
+        }
     } catch (\Throwable $e) { $custPics = []; }
 }
 
@@ -325,7 +339,17 @@ if ($failed) flash('err', 'Could not reach ' . implode(', ', $failed) . '. Every
       <div class="grid-auto">
         <div><label>From</label>
           <select name="from" id="fromSel"><?php foreach ($accounts as $acct): ?><option value="<?= e($acct) ?>"<?= $acct === $prefill['from'] ? ' selected' : '' ?>><?= e($acct) ?></option><?php endforeach; ?></select></div>
-        <div class="span-2"><label>To</label><input type="email" name="to" value="<?= e($prefill['to']) ?>" required></div>
+        <div class="span-2"><label for="toIn">To</label>
+          <div class="to-row">
+            <input type="email" name="to" id="toIn" value="<?= e($prefill['to']) ?>" required>
+            <?php foreach ($custPics as $bid => $g): if (empty($g['people'])) continue; ?>
+              <select class="to-pick" data-biz="<?= (int) $bid ?>" aria-label="Send to someone at <?= e($g['name']) ?>"<?= $g['pre'] ? '' : ' hidden' ?>>
+                <option value="">People at <?= e($g['name']) ?>…</option>
+                <?php foreach ($g['people'] as $pp): ?><option value="<?= e($pp['email']) ?>"<?= strcasecmp($pp['email'], $prefill['to']) === 0 ? ' selected' : '' ?>><?= e($pp['label']) ?> · <?= e($pp['email']) ?></option><?php endforeach; ?>
+              </select>
+            <?php endforeach; ?>
+          </div>
+        </div>
       </div>
       <label>Subject</label><input type="text" name="subject" value="<?= e($prefill['subject']) ?>">
       <label>Message</label><textarea name="body" rows="14"><?= e($prefill['body']) ?></textarea>
@@ -367,6 +391,10 @@ if ($failed) flash('err', 'Could not reach ' . implode(', ', $failed) . '. Every
       <div class="row-actions" style="margin-top:1.1rem"><button class="btn" type="submit">Send</button><a class="btn secondary" href="<?= e(mail_url()) ?>">Cancel</a></div>
     </form>
     <style>
+      .to-row{display:flex;gap:.5rem;flex-wrap:wrap}
+      .to-row input{flex:1 1 220px;min-width:0}
+      .to-row select{flex:1 1 220px;min-width:0;max-width:100%}
+      .to-row [hidden]{display:none}
       .attbox{display:grid;gap:.6rem;margin-bottom:.4rem}
       .attpick{display:inline-flex;width:fit-content;cursor:pointer;margin:0}
       .attpick input{position:absolute;width:1px;height:1px;opacity:0}
@@ -393,7 +421,12 @@ if ($failed) flash('err', 'Could not reach ' . implode(', ', $failed) . '. Every
         Array.prototype.forEach.call(inp.files, function(f){ var li = document.createElement('li'); li.textContent = f.name + ' · ' + kb(f.size); list.appendChild(li); });
       });
       var biz = document.getElementById('picBiz');
-      if (biz) biz.addEventListener('change', function(){ document.querySelectorAll('.picrow').forEach(function(r){ r.hidden = r.dataset.biz !== biz.value; }); });
+      var toIn = document.getElementById('toIn');
+      function showBiz(){ document.querySelectorAll('.picrow, .to-pick').forEach(function(r){ r.hidden = r.dataset.biz !== biz.value; }); }
+      if (biz) biz.addEventListener('change', showBiz);
+      document.querySelectorAll('.to-pick').forEach(function(sel){
+        sel.addEventListener('change', function(){ if (sel.value) { toIn.value = sel.value; toIn.dispatchEvent(new Event('input')); } });
+      });
     })();
     (function(){
       var auto = <?= json_encode((object) $sigAuto) ?>, def = <?= (int) $sigDefault ?>;
