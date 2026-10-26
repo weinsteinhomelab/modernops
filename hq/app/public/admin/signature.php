@@ -56,7 +56,7 @@ layout_header('Email signatures', $canInbox ? 'email.php' : 'account.php');
 ?>
 <style>
   .sig-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:0 3rem;align-items:start}
-  .sig-side{position:sticky;top:76px}
+  .sig-side{position:sticky;top:20px}
   .sig-paper{background:#fff;color:#333;padding:1.6rem 1.6rem 1.4rem;box-shadow:0 1px 3px rgba(0,0,0,.12),0 8px 30px rgba(0,0,0,.06);overflow-x:auto}
   /* HQ's own table styles must not leak into the preview: it should look like the email */
   .sig-reset table{width:auto}
@@ -90,7 +90,7 @@ layout_header('Email signatures', $canInbox ? 'email.php' : 'account.php');
 <?php if (!$all): ?>
   <div class="card empty">You don't have a signature yet. <a href="signature.php?new=1">Make your first one</a>.</div>
 <?php else: ?>
-  <table>
+  <div class="card"><table>
     <thead><tr><th>Signature</th><?php if ($canInbox): ?><th>Switches on for</th><?php endif; ?><th style="width:1%"></th></tr></thead>
     <tbody>
     <?php foreach ($all as $s): ?>
@@ -106,7 +106,7 @@ layout_header('Email signatures', $canInbox ? 'email.php' : 'account.php');
       </tr>
     <?php endforeach; ?>
     </tbody>
-  </table>
+  </table></div>
 <?php endif; ?>
 <?php layout_footer(); exit; endif; ?>
 

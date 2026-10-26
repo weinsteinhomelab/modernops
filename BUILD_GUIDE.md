@@ -237,13 +237,15 @@ The code is identical for every client. Two things change:
 
 | Key | What it controls |
 |---|---|
-| `name`, `portal` | Top bar, page titles, login ("Sunny Side Bakery HQ"); quote header; signature line |
-| `monogram`, `logo` | Favicon + login tile; optional logo image in the top bar and login |
+| `name` | Workspace label in the sidebar, login ("Log in to Sunny Side Bakery"); quote header; signature line |
+| `portal` | Not shown in the app any more (the app is branded Ops Essentials); kept for older configs |
+| `monogram` | The workspace badge in the sidebar ("MO") |
+| `logo` | Not shown in the app any more (quotes and PDFs use `logo_file`) |
 | `tagline`, `location`, `domain` | Quote header line; email `EHLO` |
 | `site_origin` | The website allowed to post leads to `api/submit.php` |
-| `colors.accent` / `accent_dark` | Buttons, links, active nav (light / dark mode) |
+| `colors.accent` | Quote preview, PDFs and email signatures (the app itself uses the fixed Ops Essentials green) |
+| `colors.accent_dark` | Not used by the app any more |
 | `colors.deep` / `tint` | Quote and PDF headings, total boxes, section bands |
-| `colors.highlight` | The portal word in the dark top bar |
 | `products.customers` / `quotes` / `inbox` | Which products are on |
 | `email.*` | Contact address printed on quotes, lead notifications, sending + quote mailbox, SMTP/IMAP hosts, Inbox mailboxes |
 | `quotes.tax_rate`, `tax_label` | Default tax on a new quote (each quote can change it) |

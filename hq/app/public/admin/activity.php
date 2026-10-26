@@ -12,18 +12,8 @@ $st = db()->prepare($sql);
 $st->execute($who ? [$who] : []);
 $rows = $st->fetchAll();
 
-$labels = [
-    'login' => 'Logged in', 'password.changed' => 'Changed their password',
-    'user.created' => 'Added a person', 'user.updated' => 'Updated a person',
-    'customer.created' => 'Added a customer', 'customer.updated' => 'Edited a customer', 'customer.assigned' => 'Assigned a customer',
-    'request.converted' => 'Turned a request into a customer',
-    'quote.created' => 'Created a quote', 'quote.updated' => 'Edited a quote', 'quote.sent' => 'Emailed a quote',
-    'quote.deleted' => 'Deleted a quote', 'quote.status' => 'Changed a quote status', 'quote.link' => 'Created a customer link',
-    'quote.accepted' => 'Customer accepted a quote',
-    'catalog.created' => 'Added a pricebook item', 'catalog.updated' => 'Changed a pricebook item',
-    'approval.requested' => 'Asked for approval', 'approval.approved' => 'Approved a request', 'approval.rejected' => 'Turned down a request',
-];
-$links = ['quote' => 'quote_view.php?id=', 'customer' => 'customer.php?id=', 'user' => 'user_edit.php?id=', 'request' => 'request.php?id='];
+$labels = activity_labels();
+$links = activity_links();
 
 layout_header('Activity', 'activity.php');
 ?>

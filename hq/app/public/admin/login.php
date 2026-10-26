@@ -51,45 +51,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>Log in · <?= e(brand_title()) ?></title>
+<title>Log in · Ops Essentials</title>
 <link rel="icon" href="<?= e(brand_favicon()) ?>">
 <style>
+  @font-face{font-family:'Inter';font-weight:400 700;font-display:swap;src:url(fonts/inter.woff2) format('woff2')}
+  @font-face{font-family:'Inter Tight';font-weight:600 800;font-display:swap;src:url(fonts/inter-tight.woff2) format('woff2')}
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   :root{
-    --bg:#eef0ec;--surface:#ffffff;--text:#1a1a1a;--muted:#5a5a5a;--border:#e2e2dd;
-    --accent:<?= brand_color('accent', '#1a6b4a') ?>;--accent-text:#ffffff;--field:#ffffff;--field-border:#d7d7d1;--shadow:0 10px 40px rgba(0,0,0,.08)
+    --bg:#f3f4f1;--surface:#ffffff;--text:#16201b;--muted:#6f7c76;--border:#e3e6e0;
+    --accent:#0f6e52;--accent-text:#ffffff;--field:#ffffff;--field-border:#d5dad3;--shadow:0 1px 2px rgba(16,26,22,.05),0 18px 48px -16px rgba(16,26,22,.2)
   }
   :root[data-theme="dark"]{
-    --bg:#11161a;--surface:#1b2328;--text:#eef1ee;--muted:#9fb0aa;--border:#2a353b;
-    --accent:<?= brand_color('accent_dark', '#35b082') ?>;--accent-text:#06130d;--field:#131a1f;--field-border:#30404a;--shadow:0 10px 40px rgba(0,0,0,.45)
+    --bg:#0e1311;--surface:#161d1a;--text:#e8eeea;--muted:#8a9993;--border:#26312c;
+    --accent:#3cbf8f;--accent-text:#04130d;--field:#121916;--field-border:#33413a;--shadow:0 18px 48px -16px rgba(0,0,0,.6)
   }
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-    --bg:#11161a;--surface:#1b2328;--text:#eef1ee;--muted:#9fb0aa;--border:#2a353b;
-    --accent:<?= brand_color('accent_dark', '#35b082') ?>;--accent-text:#06130d;--field:#131a1f;--field-border:#30404a;--shadow:0 10px 40px rgba(0,0,0,.45)
+    --bg:#0e1311;--surface:#161d1a;--text:#e8eeea;--muted:#8a9993;--border:#26312c;
+    --accent:#3cbf8f;--accent-text:#04130d;--field:#121916;--field-border:#33413a;--shadow:0 18px 48px -16px rgba(0,0,0,.6)
   }}
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.25rem}
+  body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.25rem;-webkit-font-smoothing:antialiased}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);width:100%;max-width:400px;padding:2.25rem 2rem}
-  .logo{width:52px;height:52px;border-radius:12px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-weight:700;font-size:1.5rem;margin:0 auto 1.1rem}
-  .logo .m{color:#1a1a1a}.logo .o{color:#fff}
-  h1{font-family:Georgia,serif;font-size:1.4rem;text-align:center;margin-bottom:.3rem}
-  .tag{text-align:center;color:var(--muted);font-size:.85rem;margin-bottom:1.6rem}
-  label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin:.9rem 0 .35rem}
-  input{width:100%;padding:.7rem .8rem;border:1px solid var(--field-border);border-radius:9px;background:var(--field);color:var(--text);font-size:.95rem;outline:none}
-  input:focus{border-color:var(--accent)}
-  button{width:100%;margin-top:1.4rem;padding:.8rem;border:none;border-radius:9px;background:var(--accent);color:var(--accent-text);font-weight:700;font-size:.95rem;cursor:pointer}
-  button:hover{opacity:.92}
-  .err{background:rgba(176,36,36,.12);color:#c0392b;border:1px solid rgba(176,36,36,.3);padding:.6rem .8rem;border-radius:8px;font-size:.85rem;margin-bottom:1rem;text-align:center}
-  :root[data-theme="dark"] .err{color:#ff9b9b}
-  .foot{text-align:center;margin-top:1.4rem;font-size:.75rem;color:var(--muted)}
-  .themebtn{position:fixed;top:1rem;right:1rem;background:var(--surface);border:1px solid var(--border);color:var(--text);width:40px;height:40px;border-radius:10px;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center}
+  .mark{height:48px;min-width:48px;padding:0 11px;border-radius:12px;background:linear-gradient(140deg,#2fb383,#0f6e52);display:flex;width:max-content;align-items:center;justify-content:center;color:#fff;font:800 19px/1 'Inter Tight',Inter,sans-serif;letter-spacing:-.01em;margin:0 auto 1.1rem}
+  .mk-ops{color:#000}
+  h1{font:700 24px/1.2 'Inter Tight',Inter,sans-serif;letter-spacing:-.02em;text-align:center;margin-bottom:.3rem}
+  .tag{text-align:center;color:var(--muted);font-size:14px;margin-bottom:1.6rem}
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin:.9rem 0 .35rem}
+  input{width:100%;padding:.65rem .8rem;border:1px solid var(--field-border);border-radius:9px;background:var(--field);color:var(--text);font:15px Inter,sans-serif;outline:none}
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
+  button{width:100%;margin-top:1.4rem;padding:.8rem;border:none;border-radius:9px;background:var(--accent);color:var(--accent-text);font:700 15px Inter,sans-serif;cursor:pointer}
+  button:hover{filter:brightness(1.06)}
+  .err{background:rgba(180,40,40,.1);color:#b42828;border:1px solid rgba(180,40,40,.25);padding:.6rem .8rem;border-radius:8px;font-size:14px;margin-bottom:1rem;text-align:center}
+  :root[data-theme="dark"] .err{color:#f08a80}
+  .foot{text-align:center;margin-top:1.4rem;font-size:12.5px;color:var(--muted)}
+  .themebtn{position:fixed;top:1rem;right:1rem;background:var(--surface);border:1px solid var(--border);color:var(--text);width:40px;height:40px;border-radius:10px;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;margin:0;padding:0}
 </style>
 </head>
 <body>
 <button class="themebtn" id="themebtn" type="button" aria-label="Toggle theme">◐</button>
 <div class="card">
-  <?= brand_mark_html() ?>
-  <h1><?= e(brand_title()) ?></h1>
-  <div class="tag">Private dashboard — authorized access only</div>
+  <span class="mark" aria-hidden="true"><span class="mk-ops">Ops</span>E</span>
+  <h1>Ops Essentials</h1>
+  <div class="tag">Log in to <?= e(client('name')) ?></div>
   <?php if ($err): ?><div class="err"><?= e($err) ?></div><?php endif; ?>
   <form method="post">
     <?= csrf_field() ?>
@@ -99,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <input id="p" type="password" name="password" autocomplete="current-password" required>
     <button type="submit">Log in</button>
   </form>
-  <div class="foot"><?= e(client('name')) ?><?= client('location') ? ' · ' . e(client('location')) : '' ?></div>
+  <div class="foot">Ops Essentials by Modern Ops · authorized access only</div>
 </div>
 <script>
   (function(){

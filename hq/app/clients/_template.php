@@ -7,8 +7,8 @@
  */
 return [
     'name'      => 'Client Business Name',
-    'portal'    => 'HQ',                 // top bar shows "Client Business Name HQ"
-    'monogram'  => 'CB',                 // 1–3 letters for the favicon and login tile
+    'portal'    => 'HQ',                 // not shown in the app (Ops Essentials branding); kept for older configs
+    'monogram'  => 'CB',                 // 1–3 letters for the workspace badge in the sidebar
     'logo'      => '',                   // optional image URL; blank = text name
     'logo_file' => '',                   // PNG/JPG for quotes and PDFs, e.g. 'public/brand/<slug>.png'; blank = name in text
     'tagline'   => 'What the business does, in one line',
@@ -23,7 +23,7 @@ return [
         'accent_dark' => '#35b082',      // accent in dark mode (lighter, readable on dark)
         'deep'        => '#0F3D2A',      // quote headings + dark total box (must be dark)
         'tint'        => '#E6F4EC',      // quote section bands (must be very light)
-        'highlight'   => '#5fcfa0',      // the portal word ("HQ") in the dark top bar
+        'highlight'   => '#5fcfa0',      // not used any more
     ],
 
     // Ops Essentials products this client pays for

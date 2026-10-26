@@ -154,16 +154,87 @@ $defNotes = $quote['notes'] ?? (string) client('quotes.notes', '');
 $termsChecked = !isset($quote['terms_included']) || $quote['terms_included'] ? 'checked' : '';
 
 layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
+$qStatus = $quote['status'] ?? 'draft';
+$qAppr = $quote['approval_status'] ?? 'none';
+// Where the quote is: drafted -> (approved) -> sent -> accepted.
+$steps = [['Drafted', true], ['Approved', $qAppr === 'approved' || in_array($qStatus, ['sent', 'accepted'], true)], ['Sent', in_array($qStatus, ['sent', 'accepted', 'declined'], true)], [$qStatus === 'declined' ? 'Declined' : 'Accepted', in_array($qStatus, ['accepted', 'declined'], true)]];
+if ($qAppr === 'none' && !in_array($qStatus, ['sent', 'accepted', 'declined'], true)) unset($steps[1]);
+$steps = array_values($steps);
+$next = count($steps); foreach ($steps as $i => [, $done]) if (!$done) { $next = $i; break; }   // the step to do next
 ?>
-<p style="margin-bottom:.5rem"><a href="quotes.php">&larr; Quotes</a></p>
-<h1 class="page"><?= $id ? 'Edit quote' : 'New quote' ?></h1>
-<p class="sub">Add saved items or custom lines. Totals update as you go.</p>
+<style>
+  .back{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;font-weight:600;margin-bottom:.9rem}
+  .q-head{display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem}
+  .q-head h1.page{margin:0;display:inline}
+  .steps{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--muted);flex-wrap:wrap;margin-top:10px}
+  .steps span{display:flex;align-items:center;gap:6px}
+  .steps .n{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--gray-soft);color:var(--text-2)}
+  .steps .done .n{background:var(--accent);color:var(--accent-text)}
+  .steps .cur{color:var(--text);font-weight:600}
+  .steps .cur .n{background:var(--text);color:var(--surface)}
+  .steps .sep{width:18px;height:1px;background:var(--border-2)}
+  .q-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:1.15rem;align-items:start}
+  .q-grid > div > .card:last-child{margin-bottom:0}
+  .q-side{position:sticky;top:20px}
+  .q-side .card{padding:0;overflow:hidden}
+  .q-side .sh{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border)}
+  .q-side .sh strong{font-size:15px;font-weight:650}
+  .q-side .sb{padding:12px 18px 16px}
+  .q-side label{margin-top:0}
+  .qtotals{display:flex;flex-direction:column;margin-top:.4rem}
+  .qtotals > div{display:flex;justify-content:space-between;gap:1rem;padding:8px 0;border-bottom:1px solid var(--border);align-items:baseline}
+  .qtotals > div[hidden]{display:none}
+  .qtotals .l{font-size:13.5px;color:var(--text-2)}
+  .qtotals .l em{font-style:normal;font-size:11.5px;color:var(--muted);margin-left:4px}
+  .qtotals .n{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+  .qtotals .grand{border-bottom:0;padding-top:12px}
+  .qtotals .grand .l{font-weight:650;color:var(--text);font-size:15px}
+  .qtotals .grand .n{font:700 22px 'Inter Tight',Inter,sans-serif}
+  .qtotals .internal{background:var(--surface-2);margin:0 -18px;padding:8px 18px}
+  .q-side .acts{display:grid;gap:8px;padding:0 18px 18px}
+  .q-side .acts .btn{width:100%}
+  .q-side .appr{margin:0 18px 14px;padding:10px 12px;border-radius:10px;font-size:13px}
+  .q-side .appr.pending{background:var(--amber-soft);color:var(--amber)}
+  .q-side .appr.rejected{background:var(--red-soft);color:var(--red)}
+  .grid3{display:grid;gap:.75rem}
+  @media(max-width:1100px){.q-grid{grid-template-columns:minmax(0,1fr)}.q-side{position:static}}
+  @media(max-width:640px){
+    .grid3{grid-template-columns:1fr !important}
+    /* each line stacks: title, then qty / cost / margin, then price / billing / total, then description */
+    .lhead{display:none !important}
+    .line-row{grid-template-columns:22px repeat(3,minmax(0,1fr)) !important;row-gap:.45rem !important;padding:.8rem 0 !important}
+    .line-row .mv{grid-row:1/span 5}
+    .line-row [name="item_title[]"]{grid-column:2/5}
+    .line-row .x{grid-column:5;grid-row:1}
+    .line-row{grid-template-columns:22px repeat(3,minmax(0,1fr)) 28px !important}
+    .line-row [name="item_desc[]"]{grid-column:2/-1 !important}
+    .line-row .optbtn{grid-column:2/-1 !important;justify-self:start !important}
+    .line-row [name="item_price[]"]{grid-column:2}
+    .line-row .lt{grid-column:span 2}
+    .qmargin{flex-wrap:wrap}
+  }
+</style>
+<a class="back" href="<?= $id ? 'quote_view.php?id=' . $id : 'quotes.php' ?>">&larr; <?= $id ? 'Back to the quote' : 'Quotes' ?></a>
+<div class="q-head">
+  <div>
+    <h1 class="page"><?= $id ? 'Quote ' . e($quote['quote_number']) : 'New quote' ?></h1>
+    <?php if ($id): ?> <span class="badge <?= e($qAppr === 'pending' ? 'contacted' : $qStatus) ?>" style="vertical-align:6px;margin-left:6px"><?= $qAppr === 'pending' ? 'Needs approval' : e(ucfirst($qStatus)) ?></span><?php endif; ?>
+    <div class="steps">
+      <?php foreach ($steps as $i => [$lbl, $done]): ?>
+        <?= $i ? '<span class="sep"></span>' : '' ?><span class="<?= $done ? 'done' : ($i === $next ? 'cur' : '') ?>"><span class="n"><?= $done ? '✓' : $i + 1 ?></span><?= e($lbl) ?></span>
+      <?php endforeach; ?>
+    </div>
+  </div>
+</div>
 <?php if ($err) flash('err', $err); ?>
 
 <form method="post" id="quoteForm">
   <?= csrf_field() ?>
+  <div class="q-grid">
+  <div>
   <div class="card">
-    <div class="grid3" style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:.75rem">
+    <strong>Customer &amp; dates</strong>
+    <div class="grid3" style="grid-template-columns:2fr 1fr 1fr">
       <div>
         <label>Business</label>
         <select name="business_id" id="businessSel" required>
@@ -177,16 +248,15 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
       <div><label>Prepared for (contact)</label><select name="contact_id" id="contactSel"><option value="">— optional —</option></select></div>
       <div><label>Quote #</label><input type="text" name="quote_number" value="<?= e($defNumber) ?>" required></div>
     </div>
-    <div class="grid3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem">
+    <div class="grid3" style="grid-template-columns:1fr 1fr">
       <div><label>Quote date</label><input type="date" name="issue_date" value="<?= e($defIssue) ?>"></div>
       <div><label>Valid until</label><input type="date" name="valid_until" value="<?= e($defValid) ?>"></div>
-      <div><label>Status</label><select name="status"><?php foreach (['draft','sent','accepted','declined'] as $s): ?><option value="<?= $s ?>"<?= ($quote['status'] ?? 'draft')===$s?' selected':'' ?>><?= ucfirst($s) ?></option><?php endforeach; ?></select></div>
     </div>
   </div>
 
   <div class="card">
     <strong>Scope of work</strong>
-    <label>Describe the work this quote covers (appears on the quote)</label>
+    <label style="margin-top:0">Describe the work this quote covers (appears on the quote)</label>
     <textarea name="scope_of_work" rows="3" placeholder="e.g. Design and build a 5-page mobile-friendly website, configure hosting and SSL, set up a business email account, and submit the Google Business Profile."><?= e($defScope) ?></textarea>
   </div>
 
@@ -238,22 +308,6 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
     <div class="lhead"><span></span><span>Item</span><span style="text-align:center">Qty</span><?= $canCosts ? '<span>Our cost</span><span>Margin %</span>' : '' ?><span>Total cost</span><span>Billing</span><span style="text-align:right">Line total</span><span></span></div>
     <div class="zone" id="zoneOpt" data-zone="optional"></div>
 
-    <!-- Totals: one row, no boxes or lines. Our cost and Profit are internal only. -->
-    <div class="qtotals">
-      <div><span class="l">One-time</span><div class="n" id="tOne">$0.00</div></div>
-      <div><span class="l">Tax</span><div class="n" id="tTax">$0.00</div></div>
-      <div><span class="l">One-time total</span><div class="n" id="tOneTotal">$0.00</div></div>
-      <div><span class="l">Recurring</span><div class="n" id="tMo">$0.00/mo</div></div>
-      <div><span class="l">Optional <em>not in totals</em></span><div class="n" id="tOpt" style="color:var(--muted)">$0.00</div></div>
-      <div<?= $canCosts ? '' : ' hidden' ?>><span class="l">Our cost <em>internal</em></span><div class="n" id="tCost" style="color:var(--muted)">$0.00</div></div>
-      <div<?= $canCosts ? '' : ' hidden' ?>><span class="l">Profit <em>internal</em></span><div class="n" id="tProfit">$0.00</div></div>
-    </div>
-    <style>
-      .qtotals{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1rem 1.5rem;margin-top:1.4rem;align-items:start}
-      .qtotals .l{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.3rem}
-      .qtotals .l em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.75}
-      .qtotals .n{font-family:Georgia,serif;font-size:1.2rem;font-weight:700;color:var(--accent);line-height:1.35}
-    </style>
   </div>
 
   <div class="card">
@@ -273,9 +327,30 @@ layout_header($id ? 'Edit quote' : 'New quote', 'quotes.php');
     <label style="margin-top:.6rem"><input type="checkbox" name="terms_included" value="1" <?= $termsChecked ?> style="width:auto;margin-right:.4rem">Include Terms &amp; Conditions + signature page in the PDF</label>
   </div>
 
-  <div class="row-actions">
-    <button class="btn" type="submit"><?= $id ? 'Save changes' : 'Create quote' ?></button>
-    <a href="<?= $id ? 'quote_view.php?id='.$id : 'quotes.php' ?>" class="btn secondary">Cancel</a>
+  </div>
+  <aside class="q-side">
+    <div class="card">
+      <div class="sh"><strong>Summary</strong></div>
+      <div class="sb">
+        <label for="qStatus">Status</label>
+        <select name="status" id="qStatus"><?php foreach (['draft','sent','accepted','declined'] as $s): ?><option value="<?= $s ?>"<?= ($quote['status'] ?? 'draft')===$s?' selected':'' ?>><?= ucfirst($s) ?></option><?php endforeach; ?></select>
+        <div class="qtotals">
+          <div><span class="l">One-time</span><div class="n" id="tOne">$0.00</div></div>
+          <div><span class="l">Tax</span><div class="n" id="tTax">$0.00</div></div>
+          <div><span class="l">Recurring</span><div class="n" id="tMo">$0.00/mo</div></div>
+          <div><span class="l">Optional<em>not in totals</em></span><div class="n" id="tOpt" style="color:var(--muted)">$0.00</div></div>
+          <div class="internal"<?= $canCosts ? '' : ' hidden' ?>><span class="l">Our cost<em>internal</em></span><div class="n" id="tCost" style="color:var(--muted)">$0.00</div></div>
+          <div class="internal"<?= $canCosts ? '' : ' hidden' ?>><span class="l">Profit<em>internal</em></span><div class="n" id="tProfit" style="color:var(--accent)">$0.00</div></div>
+          <div class="grand"><span class="l">One-time total</span><div class="n" id="tOneTotal">$0.00</div></div>
+        </div>
+      </div>
+      <?php if ($qAppr === 'pending'): ?><div class="appr pending">Waiting for an admin to approve the pricing before it can be sent.</div><?php elseif ($qAppr === 'rejected'): ?><div class="appr rejected">An admin turned down this pricing. Adjust it and save to ask again.</div><?php endif; ?>
+      <div class="acts">
+        <button class="btn" type="submit"><?= $id ? 'Save changes' : 'Create quote' ?></button>
+        <a href="<?= $id ? 'quote_view.php?id='.$id : 'quotes.php' ?>" class="btn secondary">Cancel</a>
+      </div>
+    </div>
+  </aside>
   </div>
 </form>
 

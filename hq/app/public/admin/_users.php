@@ -93,6 +93,27 @@ function people(bool $activeOnly = true): array {
     } catch (Exception $ex) { return []; }
 }
 
+/** Plain-English names for activity actions (Activity page + Dashboard). */
+function activity_labels(): array {
+    return [
+        'login' => 'Logged in', 'password.changed' => 'Changed their password',
+        'user.created' => 'Added a person', 'user.updated' => 'Updated a person',
+        'customer.created' => 'Added a customer', 'customer.updated' => 'Edited a customer', 'customer.assigned' => 'Assigned a customer',
+        'request.converted' => 'Turned a request into a customer',
+        'quote.created' => 'Created a quote', 'quote.updated' => 'Edited a quote', 'quote.sent' => 'Emailed a quote',
+        'quote.deleted' => 'Deleted a quote', 'quote.status' => 'Changed a quote status', 'quote.link' => 'Created a customer link',
+        'quote.accepted' => 'Customer accepted a quote',
+        'catalog.created' => 'Added a pricebook item', 'catalog.updated' => 'Changed a pricebook item',
+        'approval.requested' => 'Asked for approval', 'approval.approved' => 'Approved a request', 'approval.rejected' => 'Turned down a request',
+        'email.sent' => 'Sent an email', 'signature.saved' => 'Saved an email signature', 'signature.deleted' => 'Deleted an email signature',
+        'site.pictures' => 'Added website pictures',
+    ];
+}
+/** Where an activity row links to, by entity. */
+function activity_links(): array {
+    return ['quote' => 'quote_view.php?id=', 'customer' => 'customer.php?id=', 'user' => 'user_edit.php?id=', 'request' => 'request.php?id='];
+}
+
 /** Record who did what. Best effort; never breaks the page. */
 function log_activity(string $action, string $entity = '', int $entityId = 0, string $detail = ''): void {
     try {

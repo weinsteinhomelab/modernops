@@ -2,11 +2,6 @@
 /** Brand helpers: turn the client config into names, colors and the favicon. */
 require_once __DIR__ . '/config.php';
 
-/** "Modern Ops HQ" — client name plus the portal word. */
-function brand_title(): string {
-    return trim(client('name') . ' ' . client('portal', ''));
-}
-
 /** '#1a6b4a' -> [26, 107, 74] (for FPDF). */
 function hex_rgb(string $hex): array {
     $h = ltrim($hex, '#');
@@ -20,23 +15,13 @@ function brand_color(string $key, string $fallback): string {
     return preg_match('/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/', $v) ? $v : $fallback;
 }
 
-/** Favicon: rounded square in the accent color, monogram in serif (first letter dark, rest white). */
+/** Favicon: the Ops Essentials mark, a green tile with "Ops" in black and "E" in white. */
 function brand_favicon(): string {
-    $mono = (string) client('monogram', 'HQ');
-    $first = htmlspecialchars(mb_substr($mono, 0, 1), ENT_XML1);
-    $rest  = htmlspecialchars(mb_substr($mono, 1), ENT_XML1);
-    $svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='" . brand_color('accent', '#1a6b4a') . "'/>"
-         . "<text x='16' y='21.5' font-family='Georgia,serif' font-size='16' font-weight='700' text-anchor='middle'>"
-         . "<tspan fill='#1a1a1a'>$first</tspan><tspan fill='#ffffff'>$rest</tspan></text></svg>";
+    $svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#2fb383'/><stop offset='1' stop-color='#0f6e52'/></linearGradient></defs>"
+         . "<rect width='32' height='32' rx='7' fill='url(#g)'/>"
+         . "<text x='16' y='20.5' font-family='Arial,Helvetica,sans-serif' font-size='11.5' font-weight='800' text-anchor='middle' letter-spacing='-.4'>"
+         . "<tspan fill='#000000'>Ops</tspan><tspan fill='#ffffff'>E</tspan></text></svg>";
     return 'data:image/svg+xml,' . rawurlencode($svg);
-}
-
-/** Logo mark for the login page: the client's image if set, else the monogram tile. */
-function brand_mark_html(): string {
-    $logo = (string) client('logo', '');
-    if ($logo !== '') return '<img src="' . e($logo) . '" alt="' . e(client('name')) . '" style="max-height:56px;max-width:220px;display:block;margin:0 auto 1.1rem">';
-    $mono = (string) client('monogram', 'HQ');
-    return '<div class="logo"><span class="m">' . e(mb_substr($mono, 0, 1)) . '</span><span class="o">' . e(mb_substr($mono, 1)) . '</span></div>';
 }
 
 /** Ops Essentials product names. Use these exact names in labels, docs and the pricebook. */

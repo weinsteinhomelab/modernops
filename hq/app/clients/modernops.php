@@ -10,9 +10,9 @@
 return [
     // Who this copy of HQ belongs to
     'name'      => 'Modern Ops',
-    'portal'    => 'HQ',                 // shown after the name in the top bar: "Modern Ops HQ"
-    'monogram'  => 'MO',                 // favicon letters (first letter dark, rest white)
-    'logo'      => '',                   // optional image URL for the top bar and login page; blank = text name
+    'portal'    => 'HQ',                 // not shown in the app (Ops Essentials branding); kept for older configs
+    'monogram'  => 'MO',                 // workspace badge in the sidebar
+    'logo'      => '',                   // not shown in the app any more
     'logo_file' => 'public/brand/modernops.png', // PNG/JPG for quotes and PDFs (path inside hq/app); blank = name in text
     'tagline'   => 'Web & business operations for small businesses',
     'location'  => 'Serving clients across the US',
@@ -27,7 +27,7 @@ return [
         'accent_dark' => '#35b082',      // accent in dark mode
         'deep'        => '#0F3D2A',
         'tint'        => '#E6F4EC',
-        'highlight'   => '#5fcfa0',      // the portal word in the dark top bar
+        'highlight'   => '#5fcfa0',      // not used any more
     ],
 
     // Which Ops Essentials products this client pays for

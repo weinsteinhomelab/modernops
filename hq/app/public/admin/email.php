@@ -276,7 +276,7 @@ layout_header('Inbox', 'email.php');
 ?>
 <style>
   .mail{display:grid;grid-template-columns:210px minmax(0,1fr);gap:0 2rem;align-items:start}
-  .mnav{position:sticky;top:76px;display:flex;flex-direction:column;gap:.15rem}
+  .mnav{position:sticky;top:20px;display:flex;flex-direction:column;gap:.15rem}
   .mnav .compose{margin-bottom:.9rem;text-align:center}
   .mnav a.box{display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.5rem .7rem;border-radius:7px;color:var(--text);font-size:.92rem;text-decoration:none}
   .mnav a.box:hover,.mnav a.mb:hover{background:color-mix(in srgb,var(--text) 6%,transparent)}
@@ -290,6 +290,8 @@ layout_header('Inbox', 'email.php');
   .mtool{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:.6rem}
   .mtool input{max-width:300px}
   .mrow{display:grid;grid-template-columns:4px minmax(120px,210px) minmax(0,1fr) auto 72px;gap:0 .9rem;align-items:center;padding:.62rem .6rem .62rem 0;border-bottom:1px solid var(--border);color:var(--text);text-decoration:none;font-size:.9rem}
+  #mlist{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+  #mlist .mrow:last-child{border-bottom:0}
   .mrow:hover{background:color-mix(in srgb,var(--text) 4%,transparent);text-decoration:none}
   .mrow[hidden]{display:none}
   .mrow .bar{align-self:stretch;background:var(--c);border-radius:2px}
