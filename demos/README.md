@@ -1,61 +1,33 @@
-# Client preview area (`/demos/`)
+# Client previews (`/demos/`)
 
-A private staging area for showing clients their draft website before it goes
-live. Everything in this folder is published by the normal deploy pipeline
-(the `deploy.yml` workflow rsyncs the repo root to SiteGround), so once it's on
-`main` it's reachable at:
+Demo websites for prospects, each behind its own password. **The demo sites are not in this repository**
+(it's public). They live on the SiteGround server next to `public_html`:
 
 ```
-https://modern-ops.net/demos/            → the preview hub (lists all drafts)
-https://modern-ops.net/demos/<client>/   → an individual client's draft site
+~/www/modern-ops.net/demos-private/
+  demo-admin.php          add a demo / new password / list (run over SSH)
+  <slug>/site/            the demo's files (index.html, img/, …)
+  <slug>/password.hash    that company's password (hashed)
+  <slug>/name.txt         company name for the sign-in page
+  _secret, _attempts/, _views.log   created by the gate
 ```
 
-## What's here
+`demos/index.php` (this folder) is the gate. Every request under `/demos/` goes through it:
 
-- `index.html` — the preview **hub**. A branded landing page that lists every
-  client draft with a "View preview" link. Hand clients the hub link, or link
-  them straight to their own folder.
-- `doggy-spa/` — the first client draft (a dog-grooming shop).
+- `https://modern-ops.net/demos/` and unknown pages → "nothing here" (no list of demos).
+- `https://modern-ops.net/demos/<slug>/` → sign-in page for that company. The right password sets a
+  7-day cookie for that demo only.
+- 5 wrong passwords from one IP address → that address is locked out for 1 hour (all demos).
+- Every page: `noindex` (header + meta), no framing, no caching, a tiled "Made by Modern Ops · not for
+  production use" watermark with a viewer code (traceable in `_views.log`), right-click/copy/save/print
+  blocked, the watermark comes back if removed, and a copy saved to disk shows only a notice.
 
-## Adding a new client preview
+## Add a demo
 
-1. Make a folder: `demos/<client-slug>/` (e.g. `demos/rivera-bakery/`).
-2. Put the site in it as `index.html` (plus any `images/`, CSS, etc.).
-3. Add a `<meta name="robots" content="noindex, nofollow">` tag in the
-   `<head>` so search engines don't index the draft.
-4. (Recommended) Paste the slim **preview bar** from `doggy-spa/index.html`
-   (the `.preview-bar` block, right after `<body>`) so clients always know
-   they're looking at a draft, with a link back to `../`.
-5. Add a card for it in `index.html` — copy the Doggy Spa `<article class="card">`
-   block and change the name, blurb, and `href`.
-6. Commit and push to `main`. It's live under `/demos/` within a minute or two.
+1. Pick an unguessable slug: `<business>-<6 random letters/digits>`.
+2. Over SSH: `cd ~/www/modern-ops.net/demos-private && php demo-admin.php add <slug> "<Company>"` →
+   prints the password (give it only to that company).
+3. Upload the site into `<slug>/site/` (scp/rsync/tar over SSH).
+4. Link: `https://modern-ops.net/demos/<slug>/`. Record it in HQ under the customer's Websites.
 
-## Privacy
-
-These pages are **unlisted and no-indexed**, but not password-protected — anyone
-with the link can open them. That's usually fine for client review. If a client
-needs real protection, add an `.htaccess` basic-auth rule in their folder
-(SiteGround is Apache), e.g.:
-
-```apache
-# demos/<client>/.htaccess
-AuthType Basic
-AuthName "Private preview"
-AuthUserFile /home/<user>/www/modern-ops.net/.htpasswd-demos
-Require valid-user
-```
-
-...and create the `.htpasswd-demos` file with `htpasswd` on the server.
-
-## Going live
-
-When a client approves, move their site to its own real domain/hosting and
-**delete their folder from `/demos/`** (and remove its card from `index.html`)
-so the draft doesn't linger publicly.
-
-## Note on the deploy pipeline
-
-`deploy.yml` currently excludes `.git*`, `.github`, and `hq` — **not** `demos`.
-So `demos/` ships to production as-is. If you ever want previews to stay off
-production, add `--exclude='demos'` to the rsync line in the workflow, or host
-them somewhere separate.
+New password: `php demo-admin.php password <slug>`. Remove a demo: delete its folder.
