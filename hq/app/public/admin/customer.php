@@ -146,6 +146,7 @@ layout_header($b['name'], 'customers.php');
       <?php if ($b['vertical']): ?><tr><th style="border:none;width:120px">Vertical</th><td style="border:none"><?= e($b['vertical']) ?></td></tr><?php endif; ?>
       <?php if ($b['main_phone']): ?><tr><th style="border:none">Main number</th><td style="border:none"><?= e($b['main_phone']) ?></td></tr><?php endif; ?>
       <?php if ($b['main_email']): ?><tr><th style="border:none">Main email</th><td style="border:none"><a href="mailto:<?= e($b['main_email']) ?>"><?= e($b['main_email']) ?></a></td></tr><?php endif; ?>
+      <tr><th style="border:none">Their website</th><td style="border:none"><?php if (!empty($b['website'])): ?><a href="<?= e($b['website']) ?>" target="_blank" rel="noopener" style="word-break:break-all"><?= e(preg_replace('#^https?://(www\.)?#i', '', rtrim($b['website'], '/'))) ?> &#8599;</a><?php elseif (can('customers.edit')): ?><a href="customer_edit.php?id=<?= $id ?>">Add their website</a><?php else: ?><span class="muted">Not added</span><?php endif; ?></td></tr>
     </table>
   </div>
   <div class="card">

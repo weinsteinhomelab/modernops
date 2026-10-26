@@ -2,7 +2,7 @@
 /** Idempotent schema migrations so a live database upgrades itself safely. */
 require_once __DIR__ . '/_db.php';
 
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 
 /** Starting pricebook for an empty Catalog: the "catalog" list in the client file. */
 function catalog_defaults(): array {
@@ -243,6 +243,20 @@ function run_phase11_migration(): void {
     foreach ($ddl as $sql) { try { db()->exec($sql); } catch (Exception $ex) {} }
 }
 
+/** Phase 12: the customer's own website on the business record. */
+function run_phase12_migration(): void {
+    try { db()->exec("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS website VARCHAR(500) DEFAULT NULL AFTER main_email"); } catch (Exception $ex) {}
+    // Notes that are nothing but a web address were the only place to put it before: move them over.
+    try {
+        foreach (db()->query("SELECT id, notes FROM businesses WHERE (website IS NULL OR website = '') AND notes IS NOT NULL AND notes <> ''")->fetchAll() as $r) {
+            $u = trim((string) $r['notes']);
+            if (!preg_match('#^(https?://)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(/\S*)?$#i', $u)) continue;
+            if (!preg_match('#^https?://#i', $u)) $u = 'https://' . $u;
+            if (filter_var($u, FILTER_VALIDATE_URL)) db()->prepare("UPDATE businesses SET website = ?, notes = '' WHERE id = ?")->execute([$u, $r['id']]);
+        }
+    } catch (Exception $ex) {}
+}
+
 function maybe_migrate(): void {
     try {
         $v = (int) (setting('schema_version', '1'));
@@ -257,6 +271,7 @@ function maybe_migrate(): void {
         if ($v < 9) run_phase9_migration();
         if ($v < 10) run_phase10_migration();
         if ($v < 11) run_phase11_migration();
+        if ($v < 12) run_phase12_migration();
         set_setting('schema_version', (string) SCHEMA_VERSION);
     } catch (Exception $ex) {}
 }

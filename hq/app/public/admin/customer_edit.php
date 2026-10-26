@@ -3,12 +3,13 @@
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_verticals.php';
+require_once __DIR__ . '/_sites.php';
 require_login();
 require_product('customers', 'quotes');
 require_perm('customers.edit');
 
 $id = (int)($_GET['id'] ?? 0);
-$b = ['id'=>0,'name'=>'','vertical'=>'','main_phone'=>'','main_email'=>'','address'=>'','address2'=>'','city'=>'','state'=>'','country'=>'United States','zip'=>'','notes'=>''];
+$b = ['id'=>0,'name'=>'','vertical'=>'','main_phone'=>'','main_email'=>'','website'=>'','address'=>'','address2'=>'','city'=>'','state'=>'','country'=>'United States','zip'=>'','notes'=>''];
 $contacts = [];
 if ($id) {
     $st = db()->prepare('SELECT * FROM businesses WHERE id = ?');
@@ -26,9 +27,11 @@ $contactFields = ['first_name', 'last_name', 'title', 'email', 'phone'];
 $err = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
-    foreach (['name','vertical','main_phone','main_email','address','address2','city','state','country','zip','notes'] as $f) {
+    foreach (['name','vertical','main_phone','main_email','website','address','address2','city','state','country','zip','notes'] as $f) {
         $b[$f] = trim($_POST[$f] ?? '');
     }
+    $rawSite = $b['website'];
+    $b['website'] = site_clean_url($rawSite);
     // Contact rows from the form (c_id is blank for new people)
     $rows = [];
     $n = count((array)($_POST['c_first_name'] ?? []));
@@ -45,13 +48,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $err = 'A business name is required.';
     } elseif ($b['main_email'] !== '' && !filter_var($b['main_email'], FILTER_VALIDATE_EMAIL)) {
         $err = 'The main email doesn\'t look right.';
+    } elseif ($rawSite !== '' && $b['website'] === '') {
+        $b['website'] = $rawSite;
+        $err = "The website doesn't look right. Try something like " . client('domain') . '.';
     } elseif ($badEmail !== '') {
         $err = 'This contact email doesn\'t look right: ' . $badEmail;
     } else {
         $pdo = db();
         $pdo->beginTransaction();
         try {
-            $cols = ['name','vertical','main_phone','main_email','address','address2','city','state','country','zip','notes'];
+            $cols = ['name','vertical','main_phone','main_email','website','address','address2','city','state','country','zip','notes'];
             $vals = array_map(fn($c) => $b[$c], $cols);
             if ($id) {
                 $set = implode(',', array_map(fn($c) => "$c=?", $cols));
@@ -106,6 +112,7 @@ layout_header($id ? 'Edit business' : 'New business', 'customers.php');
       <div><label>Vertical / industry</label><?= vertical_select('vertical', (string)$b['vertical']) ?></div>
       <div><label>Main number</label><input type="text" name="main_phone" value="<?= e($b['main_phone']) ?>"></div>
       <div><label>Main email</label><input type="email" name="main_email" value="<?= e($b['main_email']) ?>"></div>
+      <div><label>Their website</label><input type="text" name="website" value="<?= e($b['website'] ?? '') ?>" placeholder="e.g. theirbusiness.com" inputmode="url" autocapitalize="off" spellcheck="false"></div>
       <div><label>Address</label><input type="text" name="address" value="<?= e($b['address']) ?>"></div>
       <div><label>Address 2</label><input type="text" name="address2" value="<?= e($b['address2']) ?>" placeholder="Suite, unit, floor (optional)"></div>
       <div><label>City</label><input type="text" name="city" value="<?= e($b['city']) ?>"></div>
