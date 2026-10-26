@@ -15,6 +15,10 @@ if (!can_see_business($b)) deny('This customer isn' . "'" . 't assigned to you.'
 
 $msg = '';
 $siteErr = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$_POST && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+    // a too-big upload arrives with an empty POST (no CSRF token): say so instead of failing the token check
+    header('Location: customer.php?id=' . $id . '&toobig=1#websites'); exit;
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
     $a = $_POST['action'] ?? '';
@@ -38,22 +42,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         db()->prepare('DELETE FROM touchpoints WHERE id=? AND business_id=?')->execute([(int)($_POST['tp_id'] ?? 0), $id]);
     } elseif ($a === 'add_site') {
         $kind = ($_POST['kind'] ?? '') === 'live' ? 'live' : 'demo';
-        $url = site_clean_url((string)($_POST['url'] ?? ''));
-        if ($url === '') {
-            $msg = '';
-            $siteErr = 'Enter a valid website address.';
+        $rawUrl = trim((string)($_POST['url'] ?? ''));
+        $rawLocal = $kind === 'demo' ? trim((string)($_POST['local_url'] ?? '')) : '';
+        $url = site_clean_url($rawUrl);
+        $local = site_clean_local($rawLocal);
+        if (($rawUrl !== '' && $url === '') || ($rawLocal !== '' && $local === '')) {
+            $siteErr = "One of those website addresses doesn't look right.";
+        } elseif ($url === '' && $local === '') {
+            $siteErr = $kind === 'live' ? 'Enter the website address.' : 'Enter the online demo address, the local demo address, or both.';
         } else {
-            db()->prepare('INSERT INTO sites (business_id, kind, label, url) VALUES (?,?,?,?)')
-               ->execute([$id, $kind, trim($_POST['label'] ?? '') ?: null, $url]);
+            db()->prepare('INSERT INTO sites (business_id, kind, label, url, local_url) VALUES (?,?,?,?,?)')
+               ->execute([$id, $kind, trim($_POST['label'] ?? '') ?: null, $url, $local ?: null]);
             $msg = $kind === 'live' ? 'Live website added.' : 'Demo added.';
+        }
+    } elseif ($a === 'edit_site') {
+        $sid = (int)($_POST['site_id'] ?? 0);
+        $rawUrl = trim((string)($_POST['url'] ?? ''));
+        $rawLocal = trim((string)($_POST['local_url'] ?? ''));
+        $url = site_clean_url($rawUrl);
+        $local = site_clean_local($rawLocal);
+        if (($rawUrl !== '' && $url === '') || ($rawLocal !== '' && $local === '')) {
+            $siteErr = "One of those website addresses doesn't look right.";
+        } elseif ($url === '' && $local === '') {
+            $siteErr = 'Keep at least one address, or remove the website.';
+        } else {
+            db()->prepare('UPDATE sites SET url=?, local_url=?, label=? WHERE id=? AND business_id=?')
+               ->execute([$url, $local ?: null, trim($_POST['label'] ?? '') ?: null, $sid, $id]);
+            $msg = 'Website updated.';
         }
     } elseif ($a === 'site_kind') {
         $kind = ($_POST['kind'] ?? '') === 'live' ? 'live' : 'demo';
         db()->prepare('UPDATE sites SET kind=? WHERE id=? AND business_id=?')->execute([$kind, (int)($_POST['site_id'] ?? 0), $id]);
         $msg = $kind === 'live' ? 'Marked as live.' : 'Moved back to demo.';
     } elseif ($a === 'del_site') {
-        db()->prepare('DELETE FROM sites WHERE id=? AND business_id=?')->execute([(int)($_POST['site_id'] ?? 0), $id]);
+        $sid = (int)($_POST['site_id'] ?? 0);
+        $n = db()->prepare('DELETE FROM sites WHERE id=? AND business_id=?'); $n->execute([$sid, $id]);
+        if ($n->rowCount()) { try { db()->prepare('DELETE FROM site_files WHERE site_id=? AND business_id=?')->execute([$sid, $id]); } catch (Exception $ex) {} }
         $msg = 'Website removed.';
+    } elseif ($a === 'add_pics') {
+        $sid = (int)($_POST['site_id'] ?? 0);
+        $own = db()->prepare('SELECT id FROM sites WHERE id=? AND business_id=?'); $own->execute([$sid, $id]);
+        if (!$own->fetch()) {
+            $siteErr = 'That website is no longer on this customer.';
+        } else {
+            [$saved, $errs] = site_pics_save($id, $sid, 'pics');
+            if ($saved) { $msg = $saved === 1 ? 'Picture added.' : "$saved pictures added."; log_activity('site.pictures', 'customer', $id, $b['name'] . ': ' . $saved . ' added'); }
+            if ($errs) $siteErr = implode(' ', $errs);
+        }
+    } elseif ($a === 'del_pic') {
+        try { db()->prepare('DELETE FROM site_files WHERE id=? AND business_id=?')->execute([(int)($_POST['pic_id'] ?? 0), $id]); } catch (Exception $ex) {}
+        $msg = 'Picture removed.';
     } elseif ($a === 'del_contact') {
         db()->prepare('DELETE FROM contacts WHERE id=? AND business_id=?')->execute([(int)($_POST['contact_id'] ?? 0), $id]);
         $msg = 'Contact removed.';
@@ -66,6 +104,7 @@ $tps = db()->prepare('SELECT * FROM touchpoints WHERE business_id=? ORDER BY tp_
 $quotes = db()->prepare("SELECT q.* FROM quotes q WHERE q.business_id=? AND $qs ORDER BY q.created_at DESC"); $quotes->execute(array_merge([$id], $qa)); $quotes = $quotes->fetchAll();
 $reqs = db()->prepare('SELECT * FROM requests WHERE business_id=? ORDER BY created_at DESC'); $reqs->execute([$id]); $reqs = $reqs->fetchAll();
 $sites = sites_for($id);
+$pics = site_pics_for($id);
 $demoUrls = demo_suggestions();
 
 $tpBadge = ['Call'=>'quoted','Email'=>'new','Text'=>'sent','Voicemail'=>'contacted','Meeting'=>'won','Other'=>'closed'];
@@ -98,6 +137,7 @@ layout_header($b['name'], 'customers.php');
 <?php if (isset($_GET['saved'])) flash('ok','Saved.'); ?>
 <?php if ($msg) flash('ok', $msg); ?>
 <?php if ($siteErr) flash('err', $siteErr); ?>
+<?php if (isset($_GET['toobig'])) flash('err', 'Those pictures are too big to upload at once. Add up to 10 MB per picture, a few at a time.'); ?>
 
 <div class="grid2">
   <div class="card">
@@ -117,40 +157,121 @@ layout_header($b['name'], 'customers.php');
   </div>
 </div>
 
-<div class="card">
+<div class="card" id="websites">
   <strong>Websites</strong>
+  <?php $canEdit = can('customers.edit'); ?>
   <?php if ($sites): ?>
-    <table style="margin-top:.5rem">
-      <tbody>
-      <?php foreach ($sites as $s): $live = $s['kind'] === 'live'; ?>
-        <tr>
-          <td style="width:70px"><span class="badge <?= $live ? 'won' : 'quoted' ?>"><?= $live ? 'Live' : 'Demo' ?></span></td>
-          <td>
-            <?php if ($s['label']): ?><strong><?= e($s['label']) ?></strong><br><?php endif; ?>
-            <a href="<?= e($s['url']) ?>" target="_blank" rel="noopener" style="font-size:.85rem;word-break:break-all"><?= e(preg_replace('#^https?://#', '', rtrim($s['url'], '/'))) ?> &#8599;</a>
-          </td>
-          <td style="width:1%;white-space:nowrap">
-            <div class="row-actions" style="flex-wrap:nowrap">
-              <form method="post" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="site_kind"><input type="hidden" name="site_id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="kind" value="<?= $live ? 'demo' : 'live' ?>"><button class="btn secondary small"><?= $live ? 'Back to demo' : 'Mark live' ?></button></form>
-              <form method="post" onsubmit="return confirm('Remove this website from the customer?')" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="del_site"><input type="hidden" name="site_id" value="<?= (int)$s['id'] ?>"><button class="btn danger small" title="Remove">×</button></form>
+    <div class="sites">
+    <?php foreach ($sites as $s): $live = $s['kind'] === 'live'; $sp = $pics[(int)$s['id']] ?? []; ?>
+      <div class="site">
+        <div class="site-top">
+          <span class="badge <?= $live ? 'won' : 'quoted' ?>"><?= $live ? 'Live' : 'Demo' ?></span>
+          <?php if ($s['label']): ?><strong><?= e($s['label']) ?></strong><?php endif; ?>
+          <?php if ($canEdit): ?>
+          <div class="row-actions site-acts">
+            <form method="post" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="site_kind"><input type="hidden" name="site_id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="kind" value="<?= $live ? 'demo' : 'live' ?>"><button class="btn secondary small"><?= $live ? 'Back to demo' : 'Mark live' ?></button></form>
+            <form method="post" onsubmit="return confirm('Remove this website and its pictures from the customer?')" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="del_site"><input type="hidden" name="site_id" value="<?= (int)$s['id'] ?>"><button class="btn danger small" title="Remove">×</button></form>
+          </div>
+          <?php endif; ?>
+        </div>
+        <div class="site-links">
+          <?php foreach ($live ? [['Website', $s['url']]] : [['Online demo', $s['url']], ['Local demo', $s['local_url'] ?? '']] as [$lbl, $u]): ?>
+            <div class="site-link">
+              <span class="muted"><?= e($lbl) ?></span>
+              <?php if ($u): ?><a href="<?= e($u) ?>" target="_blank" rel="noopener"><?= e(preg_replace('#^https?://#', '', rtrim($u, '/'))) ?> &#8599;</a>
+              <?php else: ?><span class="muted">Not set</span><?php endif; ?>
             </div>
-          </td>
-        </tr>
-      <?php endforeach; ?>
-      </tbody>
-    </table>
+          <?php endforeach; ?>
+        </div>
+        <?php if ($canEdit): ?>
+        <details class="site-edit">
+          <summary>Edit addresses</summary>
+          <form method="post" class="site-form">
+            <?= csrf_field() ?><input type="hidden" name="action" value="edit_site"><input type="hidden" name="site_id" value="<?= (int)$s['id'] ?>">
+            <label><?= $live ? 'Website' : 'Online demo' ?><input type="text" name="url" value="<?= e($s['url']) ?>" placeholder="<?= $live ? e(client('domain')) : 'modern-ops.net/demos/…' ?>"></label>
+            <?php if (!$live): ?><label>Local demo<input type="text" name="local_url" value="<?= e($s['local_url'] ?? '') ?>" placeholder="10.0.0.232:5196"></label><?php else: ?><input type="hidden" name="local_url" value="<?= e($s['local_url'] ?? '') ?>"><?php endif; ?>
+            <label>Label<input type="text" name="label" value="<?= e($s['label'] ?? '') ?>" placeholder="Optional"></label>
+            <button class="btn small" type="submit">Save</button>
+          </form>
+        </details>
+        <?php endif; ?>
+        <div class="pics">
+          <?php foreach ($sp as $p): ?>
+            <figure class="pic">
+              <a href="site_file.php?id=<?= (int)$p['id'] ?>" target="_blank" rel="noopener" title="<?= e($p['name']) ?>"><img src="site_file.php?id=<?= (int)$p['id'] ?>" alt="<?= e($p['name']) ?>" loading="lazy"></a>
+              <figcaption><span><?= e($p['name']) ?></span>
+                <?php if ($canEdit): ?><form method="post" onsubmit="return confirm('Remove this picture?')"><?= csrf_field() ?><input type="hidden" name="action" value="del_pic"><input type="hidden" name="pic_id" value="<?= (int)$p['id'] ?>"><button class="linkbtn" title="Remove picture">Remove</button></form><?php endif; ?>
+              </figcaption>
+            </figure>
+          <?php endforeach; ?>
+          <?php if ($canEdit): ?>
+          <form method="post" enctype="multipart/form-data" class="pic-add">
+            <?= csrf_field() ?><input type="hidden" name="action" value="add_pics"><input type="hidden" name="site_id" value="<?= (int)$s['id'] ?>">
+            <label class="pic-drop"><input type="file" name="pics[]" accept="image/jpeg,image/png,image/webp,image/gif" multiple onchange="this.form.submit()"><span>+ Add pictures</span><small>JPG, PNG, WebP or GIF · up to 10 MB each</small></label>
+          </form>
+          <?php elseif (!$sp): ?>
+            <span class="muted" style="font-size:.85rem">No pictures yet.</span>
+          <?php endif; ?>
+        </div>
+        <?php if ($sp && product_on('inbox')):
+          $mailTo = $b['main_email'] ?: (string) (array_values(array_filter(array_column($contacts, 'email')))[0] ?? ''); ?>
+          <a class="btn secondary small" style="margin-top:.6rem" href="email.php?<?= e(http_build_query(['compose' => 1, 'to' => $mailTo, 'subject' => 'A new website for ' . $b['name'], 'pics' => implode(',', array_column($sp, 'id'))])) ?>">Email these pictures</a>
+        <?php endif; ?>
+      </div>
+    <?php endforeach; ?>
+    </div>
   <?php else: ?>
     <div class="muted" style="margin:.5rem 0 0;font-size:.9rem">No demo or live website linked yet.</div>
   <?php endif; ?>
-  <form method="post" class="site-add" style="display:grid;grid-template-columns:110px 1fr 1fr auto;gap:.5rem;align-items:center;margin-top:1rem">
+  <?php if ($canEdit): ?>
+  <form method="post" class="site-add" id="siteAdd">
     <?= csrf_field() ?><input type="hidden" name="action" value="add_site">
-    <select name="kind"><option value="demo">Demo</option><option value="live">Live</option></select>
-    <input type="text" name="url" list="demo-urls" placeholder="Website address, e.g. <?= e(client('domain')) ?>" required>
-    <input type="text" name="label" placeholder="Label (optional)">
+    <label>Type<select name="kind" id="siteKind"><option value="demo">Demo</option><option value="live">Live website</option></select></label>
+    <label><span id="urlLbl">Online demo</span><input type="text" name="url" list="demo-urls" placeholder="modern-ops.net/demos/…"></label>
+    <label id="localWrap">Local demo<input type="text" name="local_url" placeholder="10.0.0.232:5196"></label>
+    <label>Label<input type="text" name="label" placeholder="Optional"></label>
     <button class="btn" type="submit">Add</button>
     <datalist id="demo-urls"><?php foreach ($demoUrls as $u): ?><option value="<?= e($u) ?>"><?php endforeach; ?></datalist>
   </form>
-  <style>@media(max-width:640px){.site-add{grid-template-columns:1fr !important}}</style>
+  <script>
+  (function(){
+    var k = document.getElementById('siteKind'), lw = document.getElementById('localWrap'), ul = document.getElementById('urlLbl');
+    function upd(){ var live = k.value === 'live'; lw.hidden = live; ul.textContent = live ? 'Website' : 'Online demo'; }
+    k.addEventListener('change', upd); upd();
+  })();
+  </script>
+  <?php endif; ?>
+  <style>
+    .sites{display:grid;gap:0;margin-top:.6rem}
+    .site{padding:.9rem 0;border-top:1px solid var(--border)}
+    .site:first-child{border-top:none;padding-top:.3rem}
+    .site-top{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+    .site-acts{margin-left:auto;flex-wrap:nowrap}
+    .site-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.4rem 1.5rem;margin-top:.5rem}
+    .site-link{display:flex;flex-direction:column;gap:.1rem;min-width:0;font-size:.9rem}
+    .site-link a{word-break:break-all}
+    .site-link .muted{font-size:.75rem;text-transform:uppercase;letter-spacing:.05em}
+    .site-edit{margin-top:.5rem;font-size:.88rem}
+    .site-edit summary{cursor:pointer;color:var(--accent);width:fit-content}
+    .site-form,.site-add{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.5rem .7rem;align-items:end;margin-top:.6rem}
+    .site-form label,.site-add label{display:flex;flex-direction:column;gap:.25rem;font-size:.8rem;margin:0}
+    .site-add{margin-top:1.1rem;padding-top:1rem;border-top:1px solid var(--border)}
+    .site-add [hidden]{display:none}
+    .pics{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:.8rem;align-items:stretch}
+    .pic{margin:0;width:150px;display:flex;flex-direction:column;gap:.3rem}
+    .pic img{width:150px;height:100px;object-fit:cover;object-position:top;border:1px solid var(--border);border-radius:4px;display:block;background:var(--border)}
+    .pic figcaption{display:flex;justify-content:space-between;gap:.4rem;font-size:.75rem;min-width:0}
+    .pic figcaption span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+    .pic form{margin:0}
+    .linkbtn{background:none;border:none;padding:0;color:var(--danger,#c0392b);font:inherit;cursor:pointer}
+    .pic-add{margin:0}
+    .pic-drop{width:150px;height:100px;border:1px dashed var(--border);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.2rem;cursor:pointer;text-align:center;padding:.4rem;margin:0}
+    .pic-drop:hover,.pic-drop:focus-within{border-color:var(--accent)}
+    .pic-drop input{position:absolute;width:1px;height:1px;opacity:0}
+    .pic-drop span{color:var(--accent);font-weight:600;font-size:.85rem}
+    .pic-drop small{color:var(--muted);font-size:.68rem;line-height:1.2}
+    @media(max-width:640px){.site-links{grid-template-columns:1fr}}
+  </style>
 </div>
 
 <div class="card">

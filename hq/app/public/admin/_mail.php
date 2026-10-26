@@ -121,3 +121,37 @@ function send_mail_pdf(string $to, string $subject, string $body, string $pdfByt
     $msg .= '--' . $boundary . "--";
     return smtp_deliver($to, $msg, $fromUser, $fromAddr);
 }
+
+/** A MIME-safe attachment filename parameter (RFC 2231 for non-ASCII names). */
+function mime_filename(string $name): string {
+    $name = trim(preg_replace('/[\x00-\x1F\x7F"\\\\\/]+/', '', $name)) ?: 'attachment';
+    if (preg_match('/[^\x20-\x7E]/', $name)) return "filename*=UTF-8''" . rawurlencode($name);
+    return 'filename="' . $name . '"';
+}
+
+/** Email with files attached: $files = [['name' => ..., 'mime' => ..., 'data' => bytes], ...].
+ *  $html = null sends plain text; otherwise text + HTML (multipart/alternative) inside multipart/mixed. */
+function send_mixed(string $to, string $subject, string $text, ?string $html, array $files, string $fromUser, string $fromAddr, string $fromName = '', string $replyTo = '', array $extra = []): bool {
+    $outer = 'MOHQ-' . bin2hex(random_bytes(10));
+    $msg  = base_headers($to, $subject, $replyTo, $fromAddr, $fromName, $extra);
+    $msg .= 'Content-Type: multipart/mixed; boundary="' . $outer . "\"\r\n\r\n";
+    $msg .= '--' . $outer . "\r\n";
+    if ($html !== null) {
+        $inner = 'MOHQ-' . bin2hex(random_bytes(10));
+        $msg .= 'Content-Type: multipart/alternative; boundary="' . $inner . "\"\r\n\r\n";
+        $msg .= '--' . $inner . "\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n" . qp($text) . "\r\n";
+        $msg .= '--' . $inner . "\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n" . qp($html) . "\r\n";
+        $msg .= '--' . $inner . "--\r\n";
+    } else {
+        $msg .= "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n" . qp($text) . "\r\n";
+    }
+    foreach ($files as $f) {
+        $mime = preg_match('#^[\w.+-]+/[\w.+-]+$#', (string)($f['mime'] ?? '')) ? $f['mime'] : 'application/octet-stream';
+        $fn = mime_filename((string)($f['name'] ?? 'attachment'));
+        $msg .= '--' . $outer . "\r\n";
+        $msg .= 'Content-Type: ' . $mime . "\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; " . $fn . "\r\n\r\n";
+        $msg .= chunk_split(base64_encode((string)$f['data'])) . "\r\n";
+    }
+    $msg .= '--' . $outer . '--';
+    return smtp_deliver($to, $msg, $fromUser, $fromAddr);
+}

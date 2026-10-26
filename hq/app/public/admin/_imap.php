@@ -303,6 +303,26 @@ function mbox_open(string $account, string $folderPath, int $uid): ?array {
     return $res;
 }
 
+/** One real (non-inline) attachment of a message, by its position in mbox_open()'s list: [name, mime, content]. */
+function mbox_attachment(string $account, string $folderPath, int $uid, int $idx): ?array {
+    $client = imap_client($account);
+    $folder = $client->getFolderByPath($folderPath);
+    $m = $folder ? $folder->query()->leaveUnread()->getMessageByUid($uid) : null;
+    if (!$m) { $client->disconnect(); return null; }
+    $html = $m->hasHTMLBody() ? (string) $m->getHTMLBody() : '';
+    $i = 0; $out = null;
+    try {
+        foreach ($m->getAttachments() as $a) {
+            $cid = trim((string)($a->id ?? ''), '<>');
+            $mime = (string)($a->content_type ?? $a->getMimeType() ?? '');
+            if ($html !== '' && $cid !== '' && stripos($html, 'cid:' . $cid) !== false && stripos($mime, 'image/') === 0) continue;   // inline picture, same rule as mbox_open
+            if ($i++ === $idx) { $out = ['name' => (string) $a->getName(), 'mime' => $mime ?: 'application/octet-stream', 'content' => (string) $a->getContent()]; break; }
+        }
+    } catch (\Throwable $e) {}
+    $client->disconnect();
+    return $out;
+}
+
 /** Move a message to another box (Deleted, Spam, Archive, back to Inbox). */
 function mbox_move(string $account, string $folderPath, int $uid, string $toBox): bool {
     try {

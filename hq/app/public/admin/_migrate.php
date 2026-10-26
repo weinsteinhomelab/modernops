@@ -2,7 +2,7 @@
 /** Idempotent schema migrations so a live database upgrades itself safely. */
 require_once __DIR__ . '/_db.php';
 
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 
 /** Starting pricebook for an empty Catalog: the "catalog" list in the client file. */
 function catalog_defaults(): array {
@@ -220,6 +220,29 @@ function run_phase10_migration(): void {
     try { db()->exec("ALTER TABLE quotes ADD COLUMN IF NOT EXISTS margin DECIMAL(8,2) DEFAULT NULL AFTER tax_label"); } catch (Exception $ex) {}
 }
 
+/** Phase 11: pictures on a customer's websites, and a locally hosted preview beside each demo. */
+function run_phase11_migration(): void {
+    $ddl = [
+        "ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_url VARCHAR(500) DEFAULT NULL AFTER url",
+        "ALTER TABLE sites MODIFY url VARCHAR(500) NOT NULL DEFAULT ''",
+        "CREATE TABLE IF NOT EXISTS site_files (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            business_id INT NOT NULL,
+            site_id INT DEFAULT NULL,
+            name VARCHAR(255) NOT NULL,
+            mime VARCHAR(100) NOT NULL,
+            size INT NOT NULL DEFAULT 0,
+            width INT DEFAULT NULL,
+            height INT DEFAULT NULL,
+            data LONGBLOB NOT NULL,
+            created_by INT DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX (business_id), INDEX (site_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+    ];
+    foreach ($ddl as $sql) { try { db()->exec($sql); } catch (Exception $ex) {} }
+}
+
 function maybe_migrate(): void {
     try {
         $v = (int) (setting('schema_version', '1'));
@@ -233,6 +256,7 @@ function maybe_migrate(): void {
         if ($v < 8) run_phase8_migration();
         if ($v < 9) run_phase9_migration();
         if ($v < 10) run_phase10_migration();
+        if ($v < 11) run_phase11_migration();
         set_setting('schema_version', (string) SCHEMA_VERSION);
     } catch (Exception $ex) {}
 }

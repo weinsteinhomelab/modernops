@@ -10,6 +10,8 @@ require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/_imap.php';
 require_once __DIR__ . '/_mail.php';
 require_once __DIR__ . '/_signature.php';
+require_once __DIR__ . '/_sites.php';
+const MAIL_ATTACH_MAX = 18 * 1024 * 1024;   // all attachments together (base64 adds a third; mail servers often cap at ~25 MB)
 require_login();
 require_product('inbox');
 
@@ -56,6 +58,38 @@ function when(int $ts): string {
 }
 
 // ---------------- Actions ----------------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$_POST && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+    // the upload was bigger than the server accepts, so nothing arrived
+    header('Location: ' . mail_url(['compose' => 1, 'senderr' => 'big'])); exit;
+}
+/** Files to send with this email: uploads, saved customer pictures, and (forwarding) the original's attachments. [files, error] */
+function compose_attachments(array $accounts): array {
+    $files = []; $total = 0;
+    $add = function (string $name, string $mime, string $data) use (&$files, &$total) { $files[] = ['name' => $name, 'mime' => $mime, 'data' => $data]; $total += strlen($data); };
+    $up = $_FILES['files'] ?? null;
+    if ($up && is_array($up['name'])) {
+        $fi = function_exists('finfo_open') ? finfo_open(FILEINFO_MIME_TYPE) : null;
+        foreach ($up['name'] as $i => $name) {
+            $err = (int) $up['error'][$i];
+            if ($err === UPLOAD_ERR_NO_FILE) continue;
+            if ($err !== UPLOAD_ERR_OK) return [[], $err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE ? 'big' : 'upload'];
+            $mime = $fi ? (string) finfo_file($fi, $up['tmp_name'][$i]) : 'application/octet-stream';
+            $add((string) $name, $mime, (string) file_get_contents($up['tmp_name'][$i]));
+        }
+    }
+    foreach ((array)($_POST['pics'] ?? []) as $pid) {
+        $p = site_pic_get((int) $pid);
+        if ($p) $add((string) $p['name'], (string) $p['mime'], (string) $p['data']);
+    }
+    $fa = (int)($_POST['fwd_a'] ?? -1); $ff = (string)($_POST['fwd_f'] ?? ''); $fu = (int)($_POST['fwd_uid'] ?? 0);
+    if (!empty($_POST['fwd_att']) && $fa >= 0 && $fa < count($accounts) && $ff !== '' && $fu > 0 && imap_box_of($ff) !== null) {
+        foreach ((array) $_POST['fwd_att'] as $ix) {
+            try { $att = mbox_attachment($accounts[$fa], $ff, $fu, (int) $ix); } catch (\Throwable $e) { $att = null; }
+            if ($att) $add($att['name'], $att['mime'], $att['content']);
+        }
+    }
+    return $total > MAIL_ATTACH_MAX ? [[], 'big'] : [$files, ''];
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
     $a = $_POST['action'] ?? '';
@@ -70,6 +104,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $irt = trim((string)($_POST['in_reply_to'] ?? ''), "<> \t");
         if ($irt !== '' && preg_match('/^[^\s<>]+$/', $irt)) { $extra['In-Reply-To'] = '<' . $irt . '>'; $extra['References'] = '<' . $irt . '>'; }
         $name = trim((string)($me['name'] ?? '')) ?: (string) client('name');
+        [$files, $attErr] = compose_attachments($accounts);
+        if ($attErr !== '') { header('Location: ' . mail_url(['compose' => 1, 'senderr' => $attErr])); exit; }
 
         $sigId = (int)($_POST['sig'] ?? 0);
         $sig = $sigId > 0 ? sig_get($uid0, $sigId, $me) : null;
@@ -82,12 +118,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $html = '<div style="' . $font . '">' . nl2br(e($top)) . '</div><br>' . sig_html($sig['data'])
                   . ($quoted !== '' ? '<div style="' . $font . ';color:#555555;margin-top:16px">' . nl2br(e($quoted)) . '</div>' : '');
             $text = $top . "\n\n-- \n" . sig_text($sig['data']) . ($quoted !== '' ? "\n\n" . $quoted : '');
-            $ok = send_alt($to, $subject, $text, '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' . $html . '</body></html>', $from, $from, $name, '', $extra);
+            $doc = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' . $html . '</body></html>';
+            $ok = $files ? send_mixed($to, $subject, $text, $doc, $files, $from, $from, $name, '', $extra)
+                         : send_alt($to, $subject, $text, $doc, $from, $from, $name, '', $extra);
         } else {
-            $ok = send_plain($to, $subject, $body, $from, $from, $name, '', $extra);
+            $ok = $files ? send_mixed($to, $subject, $body, null, $files, $from, $from, $name, '', $extra)
+                         : send_plain($to, $subject, $body, $from, $from, $name, '', $extra);
         }
         if ($ok && !empty($GLOBALS['MOHQ_LAST_SENT'])) mbox_save_sent($from, $GLOBALS['MOHQ_LAST_SENT']);
-        if ($ok) log_activity('email.sent', 'mail', 0, $from . ' → ' . $to);
+        if ($ok) log_activity('email.sent', 'mail', 0, $from . ' → ' . $to . ($files ? ' (' . count($files) . ' attachment' . (count($files) === 1 ? '' : 's') . ')' : ''));
         header('Location: ' . mail_url($ok ? ['sent' => 1] : ['compose' => 1, 'senderr' => 1]));
         exit;
     }
@@ -110,10 +149,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Location: ' . mail_url()); exit;
 }
 
+// ---------------- Download one attachment (?att=N on a message) ----------------
+if (isset($_GET['att']) && ($r = msg_ref($accounts))) {
+    try { $att = mbox_attachment($r[0], $r[1], $r[2], (int) $_GET['att']); } catch (\Throwable $e) { $att = null; }
+    if (!$att) { http_response_code(404); exit('Attachment not found. It may have been moved.'); }
+    $fn = preg_replace('/[^\w .()-]+/', '_', $att['name']) ?: 'attachment';
+    header('Content-Type: application/octet-stream');           // always a download, never shown in HQ's own page
+    header('Content-Disposition: attachment; filename="' . $fn . '"');
+    header('X-Content-Type-Options: nosniff');
+    header('Content-Length: ' . strlen($att['content']));
+    echo $att['content'];
+    exit;
+}
+
 // ---------------- What to show ----------------
 $view = 'list';
 $msg = null; $err = '';
-$prefill = ['to' => '', 'subject' => '', 'body' => '', 'from' => $only ?: $accounts[0], 'irt' => ''];
+$prefill = ['to' => '', 'subject' => '', 'body' => '', 'from' => $only ?: $accounts[0], 'irt' => '', 'fwd' => null, 'fwd_atts' => [],
+            'pics' => array_map('intval', array_filter(explode(',', (string)($_GET['pics'] ?? ''))))];
+if (isset($_GET['compose']) && filter_var((string)($_GET['to'] ?? ''), FILTER_VALIDATE_EMAIL)) $prefill['to'] = (string) $_GET['to'];
+if (isset($_GET['compose']) && isset($_GET['subject'])) $prefill['subject'] = mb_substr((string) $_GET['subject'], 0, 200);
 $ref = msg_ref($accounts);
 
 if (isset($_GET['compose'])) {
@@ -134,7 +189,7 @@ if (isset($_GET['compose'])) {
                 $prefill['subject'] = (stripos($src['subject'], 'fwd:') === 0 ? '' : 'Fwd: ') . $src['subject'];
                 $q = "\n\n-------- Forwarded message --------\nFrom: " . $src['from_name'] . ' <' . $src['from_mail'] . ">\nDate: " . $src['date']
                    . "\nSubject: " . $src['subject'] . "\nTo: " . $src['to'] . "\n\n" . $src['body'] . "\n";
-                if ($src['attachments']) $q .= "\n(Attachments not included: " . implode(', ', $src['attachments']) . ")\n";
+                if ($src['attachments']) { $prefill['fwd'] = msg_qs($accounts, $ref[0], $ref[1], $ref[2]); $prefill['fwd_atts'] = $src['attachments']; }
             }
             $prefill['body'] = $q;
         }
@@ -161,6 +216,22 @@ foreach ($accounts as $acct) {
     if ($box === 'inbox' && $view === 'list') $rows = array_filter($list, fn($r) => $r['account'] === $acct);
     else { $cf = mbox_cache_file($acct, 'inbox', 40); $rows = is_file($cf) ? (array) json_decode((string) file_get_contents($cf), true) : []; }
     foreach ($rows as $r) if (empty($r['seen'])) $unread++;
+}
+
+// Website pictures this person may attach, grouped by customer (newest customers' pictures first in each group).
+$custPics = [];
+if ($view === 'compose' && product_on('customers')) {
+    try {
+        [$bs, $ba] = biz_scope('b');
+        $st = db()->prepare("SELECT f.id, f.name, f.business_id, b.name AS bname FROM site_files f JOIN businesses b ON b.id = f.business_id WHERE $bs ORDER BY b.name, f.created_at DESC");
+        $st->execute($ba);
+        foreach ($st->fetchAll() as $r) {
+            $bid = (int) $r['business_id'];
+            $custPics[$bid] ??= ['name' => $r['bname'], 'pics' => [], 'pre' => false];
+            $custPics[$bid]['pics'][] = $r;
+            if (in_array((int) $r['id'], $prefill['pics'], true)) $custPics[$bid]['pre'] = true;
+        }
+    } catch (\Throwable $e) { $custPics = []; }
 }
 
 // Signatures for compose, and which one each From address switches on.
@@ -247,7 +318,8 @@ if ($failed) flash('err', 'Could not reach ' . implode(', ', $failed) . '. Every
   <section>
   <?php if ($view === 'compose'): ?>
     <h1 class="page" style="margin-bottom:.4rem"><?= isset($_GET['reply']) ? 'Reply' : (isset($_GET['fwd']) ? 'Forward' : 'New message') ?></h1>
-    <form method="post" id="composeForm">
+    <?php if (($_GET['senderr'] ?? '') === 'big') flash('err', 'The attachments are too big. Keep them under 18 MB in total.'); elseif (($_GET['senderr'] ?? '') === 'upload') flash('err', "A file didn't upload. Try attaching it again."); ?>
+    <form method="post" id="composeForm" enctype="multipart/form-data">
       <?= csrf_field() ?><input type="hidden" name="action" value="send">
       <input type="hidden" name="in_reply_to" value="<?= e($prefill['irt']) ?>">
       <div class="grid-auto">
@@ -257,6 +329,30 @@ if ($failed) flash('err', 'Could not reach ' . implode(', ', $failed) . '. Every
       </div>
       <label>Subject</label><input type="text" name="subject" value="<?= e($prefill['subject']) ?>">
       <label>Message</label><textarea name="body" rows="14"><?= e($prefill['body']) ?></textarea>
+      <label>Attachments</label>
+      <div class="attbox">
+        <label class="attpick"><input type="file" name="files[]" id="attFiles" multiple><span>+ Attach files</span></label>
+        <ul class="attlist" id="attList"></ul>
+        <?php if ($prefill['fwd']): ?>
+          <input type="hidden" name="fwd_a" value="<?= (int) $prefill['fwd']['a'] ?>"><input type="hidden" name="fwd_f" value="<?= e($prefill['fwd']['f']) ?>"><input type="hidden" name="fwd_uid" value="<?= (int) $prefill['fwd']['uid'] ?>">
+          <div class="attgroup"><span class="muted">From the original email</span>
+            <?php foreach ($prefill['fwd_atts'] as $i => $an): ?><label class="attchk"><input type="checkbox" name="fwd_att[]" value="<?= (int) $i ?>" checked> <?= e($an) ?></label><?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+        <?php if ($custPics): ?>
+          <div class="attgroup"><span class="muted">Website pictures from a customer</span>
+            <select id="picBiz" style="max-width:320px"><option value="">Pick a customer…</option><?php foreach ($custPics as $bid => $g): ?><option value="<?= (int) $bid ?>"<?= $g['pre'] ? ' selected' : '' ?>><?= e($g['name']) ?> (<?= count($g['pics']) ?>)</option><?php endforeach; ?></select>
+            <?php foreach ($custPics as $bid => $g): ?>
+              <div class="picrow" data-biz="<?= (int) $bid ?>"<?= $g['pre'] ? '' : ' hidden' ?>>
+                <?php foreach ($g['pics'] as $p): ?>
+                  <label class="picchk"><input type="checkbox" name="pics[]" value="<?= (int) $p['id'] ?>"<?= in_array((int) $p['id'], $prefill['pics'], true) ? ' checked' : '' ?>><img src="site_file.php?id=<?= (int) $p['id'] ?>" alt="" loading="lazy"><span><?= e($p['name']) ?></span></label>
+                <?php endforeach; ?>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+        <div class="muted" style="font-size:.8rem">Up to 18 MB in total.</div>
+      </div>
       <label>Signature</label>
       <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
         <select name="sig" id="sigSel" style="max-width:320px">
@@ -270,7 +366,35 @@ if ($failed) flash('err', 'Could not reach ' . implode(', ', $failed) . '. Every
       <?php endforeach; ?>
       <div class="row-actions" style="margin-top:1.1rem"><button class="btn" type="submit">Send</button><a class="btn secondary" href="<?= e(mail_url()) ?>">Cancel</a></div>
     </form>
+    <style>
+      .attbox{display:grid;gap:.6rem;margin-bottom:.4rem}
+      .attpick{display:inline-flex;width:fit-content;cursor:pointer;margin:0}
+      .attpick input{position:absolute;width:1px;height:1px;opacity:0}
+      .attpick span{border:1px dashed var(--border);border-radius:6px;padding:.45rem .8rem;color:var(--accent);font-weight:600;font-size:.88rem}
+      .attpick:focus-within span,.attpick:hover span{border-color:var(--accent)}
+      .attlist{list-style:none;margin:0;padding:0;display:grid;gap:.2rem;font-size:.85rem}
+      .attlist:empty{display:none}
+      .attgroup{display:grid;gap:.4rem;font-size:.85rem}
+      .attchk{display:flex;gap:.4rem;align-items:center;margin:0;font-weight:400}
+      .picrow{display:flex;flex-wrap:wrap;gap:.6rem}
+      .picrow[hidden]{display:none}
+      .picchk{display:grid;gap:.25rem;width:132px;margin:0;font-weight:400;font-size:.75rem;cursor:pointer;position:relative}
+      .picchk input{position:absolute;top:6px;left:6px;width:18px;height:18px}
+      .picchk img{width:132px;height:88px;object-fit:cover;object-position:top;border:2px solid var(--border);border-radius:4px}
+      .picchk input:checked ~ img{border-color:var(--accent)}
+      .picchk span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    </style>
     <script>
+    (function(){
+      var inp = document.getElementById('attFiles'), list = document.getElementById('attList');
+      function kb(n){ return n >= 1048576 ? (n/1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n/1024)) + ' KB'; }
+      if (inp) inp.addEventListener('change', function(){
+        list.innerHTML = '';
+        Array.prototype.forEach.call(inp.files, function(f){ var li = document.createElement('li'); li.textContent = f.name + ' · ' + kb(f.size); list.appendChild(li); });
+      });
+      var biz = document.getElementById('picBiz');
+      if (biz) biz.addEventListener('change', function(){ document.querySelectorAll('.picrow').forEach(function(r){ r.hidden = r.dataset.biz !== biz.value; }); });
+    })();
     (function(){
       var auto = <?= json_encode((object) $sigAuto) ?>, def = <?= (int) $sigDefault ?>;
       var from = document.getElementById('fromSel'), sel = document.getElementById('sigSel'), touched = false;
@@ -292,7 +416,7 @@ if ($failed) flash('err', 'Could not reach ' . implode(', ', $failed) . '. Every
       <div style="font-size:.9rem"><strong><?= e($msg['from_name']) ?></strong> <span class="muted">&lt;<?= e($msg['from_mail']) ?>&gt;</span></div>
       <div class="muted" style="font-size:.84rem">To <?= e($msg['to']) ?><?= $msg['cc'] !== '' ? ' · Cc ' . e($msg['cc']) : '' ?> · <?= e($msg['date']) ?></div>
       <div style="margin-top:.35rem"><span class="mbchip" style="--c:<?= e($c) ?>"><?= $inBox === 'sent' ? 'Sent from ' : 'Came in to ' ?><?= e($msg['account']) ?></span></div>
-      <?php if ($msg['attachments']): ?><div class="muted" style="font-size:.84rem;margin-top:.4rem">Attachments: <?= e(implode(', ', $msg['attachments'])) ?></div><?php endif; ?>
+      <?php if ($msg['attachments']): ?><div class="atts" style="font-size:.84rem;margin-top:.4rem;display:flex;flex-wrap:wrap;gap:.3rem .9rem;align-items:center"><span class="muted">Attachments</span><?php foreach ($msg['attachments'] as $i => $an): ?><a href="<?= e(mail_url($qs + ['att' => $i])) ?>" download>&#8681; <?= e($an ?: 'attachment') ?></a><?php endforeach; ?></div><?php endif; ?>
     </div>
     <div class="mact">
       <?php if ($inBox !== 'drafts'): ?><a class="btn small" href="<?= e(mail_url($qs + ['reply' => 1])) ?>">Reply</a><?php endif; ?>

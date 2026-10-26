@@ -17,7 +17,7 @@ function layout_header(string $title, string $active = ''): void {
         $nav['catalog.php'] = ['Catalog', product_name('quotes')];
     }
     if (product_on('inbox') && (!$who || my_mailboxes())) $nav['email.php'] = ['Inbox', product_name('inbox')];
-    if (client('previews')) $nav[rtrim(SITE_ORIGIN, '/') . '/demos/'] = ['Previews', ''];
+    if (client('previews') && (product_on('customers') || product_on('quotes'))) $nav['previews.php'] = ['Previews', ''];
     // Admin-only pages
     if ($who && is_admin()) {
         $pending = pending_approvals();

@@ -26,3 +26,6 @@ COPY clients/ /var/www/html/clients/
 RUN chown -R www-data:www-data /var/www/html
 
 EXPOSE 80
+
+# Uploads: website pictures (10 MB each) and email attachments (18 MB per email)
+RUN printf 'upload_max_filesize=12M\npost_max_size=40M\nmax_file_uploads=20\nmemory_limit=256M\n' > /usr/local/etc/php/conf.d/uploads.ini
