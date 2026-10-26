@@ -248,6 +248,20 @@ if ($view === 'compose' && product_on('customers')) {
     } catch (\Throwable $e) { $custPics = []; }
 }
 
+// Names spell check should accept: customers, contacts and team members this person can see, plus the business name.
+$spellNames = [];
+if ($view === 'compose') {
+    $spellNames = [(string) client('name'), (string) ($me['name'] ?? '')];
+    try {
+        [$bs, $ba] = biz_scope('b');
+        $st = db()->prepare("SELECT b.name, c.first_name, c.last_name FROM businesses b LEFT JOIN contacts c ON c.business_id = b.id WHERE $bs");
+        $st->execute($ba);
+        foreach ($st->fetchAll() as $r) array_push($spellNames, (string) $r['name'], (string) $r['first_name'], (string) $r['last_name']);
+        foreach (people() as $p) $spellNames[] = (string) ($p['name'] ?? '');
+    } catch (\Throwable $e) {}
+    $spellNames = array_values(array_unique(array_filter($spellNames)));
+}
+
 // Signatures for compose, and which one each From address switches on.
 $sigs = []; $sigAuto = []; $sigDefault = 0;
 if ($view === 'compose') {
@@ -351,8 +365,10 @@ if ($failed) flash('err', 'Could not reach ' . implode(', ', $failed) . '. Every
           </div>
         </div>
       </div>
-      <label>Subject</label><input type="text" name="subject" value="<?= e($prefill['subject']) ?>">
-      <label>Message</label><textarea name="body" rows="14"><?= e($prefill['body']) ?></textarea>
+      <label>Subject</label><input type="text" name="subject" value="<?= e($prefill['subject']) ?>" spellcheck="true" autocorrect="on" autocapitalize="sentences" lang="en">
+      <label>Message</label><textarea name="body" rows="14" spellcheck="true" autocorrect="on" autocapitalize="sentences" lang="en"><?= e($prefill['body']) ?></textarea>
+      <div class="spellbar"><button type="button" class="btn secondary small" id="spellBtn">Check spelling</button></div>
+      <div class="spellbox" id="spell" hidden aria-live="polite"></div>
       <label>Attachments</label>
       <div class="attbox">
         <label class="attpick"><input type="file" name="files[]" id="attFiles" multiple><span>+ Attach files</span></label>
@@ -391,6 +407,14 @@ if ($failed) flash('err', 'Could not reach ' . implode(', ', $failed) . '. Every
       <div class="row-actions" style="margin-top:1.1rem"><button class="btn" type="submit">Send</button><a class="btn secondary" href="<?= e(mail_url()) ?>">Cancel</a></div>
     </form>
     <style>
+      .spellbar{margin-top:.5rem}
+      .spellbox{margin-top:.6rem;padding:.8rem 1rem;border:1px solid var(--border);border-radius:6px;display:grid;gap:.5rem;font-size:.9rem}
+      .spellbox[hidden]{display:none}
+      .spell-msg{font-weight:600}
+      .spell-msg.good{color:var(--accent)}
+      .spell-item{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .5rem;padding-top:.45rem;border-top:1px solid var(--border)}
+      .spell-word{font-weight:600;text-decoration:underline wavy #d33;text-underline-offset:3px;margin-right:.3rem}
+      .spellbox .linkbtn{background:none;border:none;padding:0 .2rem;color:var(--muted);font:inherit;font-size:.85rem;cursor:pointer;text-decoration:underline}
       .to-row{display:flex;gap:.5rem;flex-wrap:wrap}
       .to-row input{flex:1 1 220px;min-width:0}
       .to-row select{flex:1 1 220px;min-width:0;max-width:100%}
@@ -426,6 +450,99 @@ if ($failed) flash('err', 'Could not reach ' . implode(', ', $failed) . '. Every
       if (biz) biz.addEventListener('change', showBiz);
       document.querySelectorAll('.to-pick').forEach(function(sel){
         sel.addEventListener('change', function(){ if (sel.value) { toIn.value = sel.value; toIn.dispatchEvent(new Event('input')); } });
+      });
+    })();
+    /* ---- Spell check: the browser's own red underlines are on for Subject + Message; "Check spelling" lists each
+       misspelled word with one-tap fixes (Typo.js + en_US in spell/, loaded the first time). Quoted replies, links and
+       email addresses are skipped; customer, contact and team names count as real words, plus any word you keep. ---- */
+    (function(){
+      var KEY = 'hqSpellWords', speller = null, loading = null;
+      var NAMES = <?= json_encode($spellNames) ?>;
+      var subj = document.querySelector('#composeForm input[name=subject]'), body = document.querySelector('#composeForm textarea[name=body]');
+      var box = document.getElementById('spell'), btn = document.getElementById('spellBtn');
+      function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+      function myWords(){ try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } }
+      function keep(w){ var l = myWords(); w = w.toLowerCase(); if (l.indexOf(w) < 0) { l.push(w); try { localStorage.setItem(KEY, JSON.stringify(l)); } catch (e) {} } }
+      function load(){
+        if (speller) return Promise.resolve(speller);
+        if (loading) return loading;
+        loading = new Promise(function(res, rej){
+          var s = document.createElement('script'); s.src = 'spell/typo.js?v=1.2.4';
+          s.onload = function(){
+            Promise.all(['aff','dic'].map(function(x){ return fetch('spell/en_US.' + x + '?v=1').then(function(r){ if (!r.ok) throw new Error('dict'); return r.text(); }); }))
+              .then(function(t){ speller = new Typo('en_US', t[0], t[1]); res(speller); }, rej);
+          };
+          s.onerror = rej; document.head.appendChild(s);
+        });
+        loading.catch(function(){ loading = null; });
+        return loading;
+      }
+      function known(){
+        var set = {};
+        myWords().concat(NAMES).forEach(function(s){ String(s || '').replace(/[’‘]/g, "'").split(/[^A-Za-z']+/).forEach(function(w){ if (w) set[w.toLowerCase()] = 1; }); });
+        return set;
+      }
+      function ok(w, k){
+        if (k[w.toLowerCase()] || w.length < 2 || (w === w.toUpperCase() && w.length <= 6)) return true;
+        if (speller.check(w)) return true;
+        return /'s$/i.test(w) && speller.check(w.slice(0, -2));
+      }
+      /* only what you wrote: stop at a quoted reply or forward, skip "> " lines */
+      function ownText(v){
+        var cut = v.search(/\n(--- On |-------- Forwarded message)/);
+        return (cut < 0 ? v : v.slice(0, cut)).split('\n').filter(function(l){ return !/^\s*>/.test(l); }).join('\n');
+      }
+      function mistakes(){
+        var k = known(), out = [], seen = {};
+        [[subj, subj.value], [body, ownText(body.value)]].forEach(function(p){
+          var text = p[1].replace(/(https?:\/\/|www\.)\S+|\S+@\S+/g, ' ').replace(/[’‘]/g, "'");
+          (text.match(/[A-Za-z]+(?:'[A-Za-z]+)*/g) || []).forEach(function(w){
+            var key = w.toLowerCase(); if (seen[key] || ok(w, k)) return;
+            seen[key] = 1; out.push({ word: w, el: p[0] });
+          });
+        });
+        return out;
+      }
+      function fixCase(orig, s){ var c = orig.charAt(0); return c !== c.toLowerCase() ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+      function replaceWord(el, from, to){
+        var re = new RegExp("(^|[^A-Za-z'’])(" + from.replace(/'/g, "['’]") + ")(?![A-Za-z])", 'gi');
+        if (el === body) {   // leave the quoted part alone
+          var v = el.value, cut = v.search(/\n(--- On |-------- Forwarded message)/), head = cut < 0 ? v : v.slice(0, cut), tail = cut < 0 ? '' : v.slice(cut);
+          el.value = head.split('\n').map(function(l){ return /^\s*>/.test(l) ? l : l.replace(re, function(_, pre, w){ return pre + fixCase(w, to); }); }).join('\n') + tail;
+        } else el.value = el.value.replace(re, function(_, pre, w){ return pre + fixCase(w, to); });
+      }
+      function dist(a, b){
+        var d = [], i, j; for (i = 0; i <= a.length; i++) d[i] = [i]; for (j = 0; j <= b.length; j++) d[0][j] = j;
+        for (i = 1; i <= a.length; i++) for (j = 1; j <= b.length; j++) {
+          d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+          if (i > 1 && j > 1 && a[i-1] === b[j-2] && a[i-2] === b[j-1]) d[i][j] = Math.min(d[i][j], d[i-2][j-2] + 1);
+        }
+        return d[a.length][b.length];
+      }
+      function suggestions(word){
+        var w = word.toLowerCase(), seen = {}, srt = function(x){ return x.split('').sort().join(''); }, all = speller.suggest(word, 8);
+        all.forEach(function(s){ var k = s.toLowerCase(); if (!seen[k] || s === k) seen[k] = s; });
+        return Object.keys(seen).map(function(k){ return { s: seen[k], i: all.indexOf(seen[k]), d: dist(w, k), a: srt(w) === srt(k) ? 0 : 1, f: w[0] === k[0] ? 0 : 1 }; })
+          .sort(function(x, y){ return x.d - y.d || x.a - y.a || x.f - y.f || x.i - y.i; })
+          .filter(function(x, i){ return i === 0 || x.d <= 2; }).slice(0, 3).map(function(x){ return fixCase(word, x.s); });
+      }
+      function draw(){
+        var list = mistakes();
+        box.hidden = false;
+        if (!list.length) { box.innerHTML = '<div class="spell-msg good">No spelling mistakes found.</div>'; return; }
+        box.innerHTML = '<div class="spell-msg">' + (list.length === 1 ? '1 word to check' : list.length + ' words to check') + '</div>' + list.map(function(m, i){
+          var sug = suggestions(m.word);
+          return '<div class="spell-item"><span class="spell-word">' + esc(m.word) + '</span>'
+            + (sug.length ? sug.map(function(s){ return '<button type="button" class="btn secondary small" data-fix="' + i + '" data-to="' + esc(s) + '">' + esc(s) + '</button>'; }).join('') : '<span class="muted">No suggestions. Fix it in the message, or keep it.</span>')
+            + '<button type="button" class="linkbtn" data-keep="' + i + '">Keep it</button></div>';
+        }).join('');
+        box.querySelectorAll('[data-fix]').forEach(function(b){ b.onclick = function(){ var m = list[+b.dataset.fix]; replaceWord(m.el, m.word, b.dataset.to); draw(); }; });
+        box.querySelectorAll('[data-keep]').forEach(function(b){ b.onclick = function(){ keep(list[+b.dataset.keep].word); draw(); }; });
+      }
+      btn.addEventListener('click', function(){
+        box.hidden = false;
+        box.innerHTML = '<div class="spell-msg">Checking spelling…' + (speller ? '' : ' <span class="muted">(the first time takes a few seconds)</span>') + '</div>';
+        load().then(function(){ setTimeout(draw, 20); }, function(){ box.innerHTML = '<div class="spell-msg">Spell check couldn’t load. Try again in a moment.</div>'; });
       });
     })();
     (function(){
